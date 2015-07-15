@@ -14,6 +14,8 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound );
 
 Json::Value read_1588_database(std::string file_path);
 
+void search_database_keys_for_input(const std::string &construction_name, const std::string &field_name, const std::vector< std::string > &keys, const std::string &input, bool &ErrorsFound);
+
 void create_dummy_variables();
 
 void remove_dummy_variables();
