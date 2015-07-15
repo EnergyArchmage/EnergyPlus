@@ -62,21 +62,39 @@ void
 CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 {
 
-  int ConstructNumAlpha; // Number of construction alpha names being passed
-  int ConstructNumNumeric; // dummy variable for properties being passed
-  int IOStat; // IO Status when calling get input subroutine
-  Array1D_string ConstructAlphas( 8 ); // Construction Alpha names defined
-  Array1D< Real64 > ConstructNumerics( 8 ); // Temporary array to transfer construction properties
-  bool ErrorInName;
-  bool IsBlank;
-  int Loop;
-
   bool stand_alone_analysis = true;  // TODO preprocess this for special executable
 
+  // First read location of the 1588 database file
+  if ( GetNumObjectsFound( "DatabaseFile:WindowASHRAE1588RP" ) > 1 ) {
+    std::cout << "Error: There should be only one DatabaseFile:WindowASHRAE1588RP object." << std::endl;
+    ShowFatalError( "There are multiple DatabaseFile:WindowASHRAE1588RP objects." );
+  }
 
-  int TotWinASHRAE1588Constructs = GetNumObjectsFound( "Construction:WindowASHRAE1588RP" ); // Number of window constructions based on ASHRAE 1588RP
+  if ( GetNumObjectsFound( "DatabaseFile:WindowASHRAE1588RP" ) < 1 ) {
+    std::cout << "Error: There is no DatabaseFile:WindowASHRAE1588RP object. There must be a DatabaseFile:WindowASHRAE1588RP if your input file contains any Construction:WindowASHRAE1588RP objects." << std::endl;
+    ShowFatalError( "There is no DatabaseFile:WindowASHRAE1588RP object. There must be a DatabaseFile:WindowASHRAE1588RP if your input file contains any Construction:WindowASHRAE1588RP objects." );
+  }
 
-  std::string db_1588_file_path = "../../../../datasets/1588.json";
+  int database_num_alpha;
+  int database_num_numeric;
+  Array1D_string database_alphas( 1 ); // Alpha values array
+  Array1D< Real64 > database_numerics( 0 ); // Numeric values array
+  int IOStat; // IO Status when calling get input subroutine
+
+  GetObjectItem( "DatabaseFile:WindowASHRAE1588RP", 1, database_alphas, database_num_alpha, database_numerics, database_num_numeric, IOStat, lNumericFieldBlanks, lAlphaFieldBlanks, cAlphaFieldNames, cNumericFieldNames );
+
+  std::string db_1588_file_path_input = database_alphas( 1 );
+  std::string db_1588_file_path;
+  bool exists;
+
+  CheckForActualFileName( db_1588_file_path_input, exists, db_1588_file_path );
+  if ( ! exists ) {
+    ShowSevereError( "WindowASHRAE1588RP: Could not locate the ASHRAE 1588 window database, expecting it as file name=" + db_1588_file_path_input );
+    ShowContinueError( "Certain run environments require a full path to be included with the file name in the input field." );
+    ShowContinueError( "Try again with putting full path and file name in the field." );
+    ShowFatalError( "Program terminates due to these conditions." );
+  }
+
   Json::Value root = read_1588_database(db_1588_file_path);
 
   // Get the thickness keys from the database
@@ -114,6 +132,16 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
   Real64 s_outdoor_temp = root["Tests"]["SHGC"]["Outdoor Temperature"].asDouble();
   Real64 s_wind_speed = root["Tests"]["SHGC"]["Wind Speed"].asDouble();
   Real64 s_solar = root["Tests"]["SHGC"]["Solar Incidence"].asDouble();
+
+  int ConstructNumAlpha; // Number of construction alpha names being passed
+  int ConstructNumNumeric; // dummy variable for properties being passed
+  Array1D_string ConstructAlphas( 8 ); // Construction Alpha names defined
+  Array1D< Real64 > ConstructNumerics( 8 ); // Temporary array to transfer construction properties
+  bool ErrorInName;
+  bool IsBlank;
+  int Loop;
+
+  int TotWinASHRAE1588Constructs = GetNumObjectsFound( "Construction:WindowASHRAE1588RP" ); // Number of window constructions based on ASHRAE 1588RP
 
   CurrentModuleObject = "Construction:WindowASHRAE1588RP";
   for ( Loop = 1; Loop <= TotWinASHRAE1588Constructs; ++Loop ) { // Loop through all WindowASHRAE1588RP constructions.
@@ -153,7 +181,7 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
     // Read spectral data from database
 
     // Save Spectral Data
-    int TotSpectralDataSave = TotSpectralData;
+    //int TotSpectralDataSave = TotSpectralData;
     Array1D< SpectralDataProperties > SpectralDataSave;
     SpectralDataSave.allocate( TotSpectralData );
     SpectralDataSave = SpectralData;
@@ -189,9 +217,6 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 
 
     ConstructionData new_construct;
-
-    // Processes inputs
-    bool ErrorsFound = false;
 
     // Name
     std::string construction_name = ConstructAlphas( 1 );

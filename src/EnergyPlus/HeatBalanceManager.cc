@@ -3692,9 +3692,6 @@ namespace HeatBalanceManager {
 		// ASHRAE 1588 Construction
 		if ( TotWinASHRAE1588Constructs > 0 ) {
 			CreateASHRAE1588RPConstructions( ConstrNum, ErrorsFound );
-			if ( ErrorsFound ) {
-				ShowSevereError( "Errors found in creating the window constructions for ASHRAE 1588RP inputs." );
-			}
 			TotRegConstructs += TotWinASHRAE1588Constructs;
 		}
 
