@@ -927,7 +927,7 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
         output_1588["Glazing"]["Gaps"][i]["Primary Gas"] = gas_type;
         output_1588["Glazing"]["Gaps"][i]["Thickness"] = gap_thickness;
         for (int gas = 0; gas < num_gases; gas++) {
-          output_1588["Glazing"]["Gaps"][i]["Gases"][gas] = root["Gases"][gas_type][gas];
+          output_1588["Glazing"]["Gaps"][i]["Mixture"][gas] = root["Gases"][gas_type][gas];
         }
       }
 
