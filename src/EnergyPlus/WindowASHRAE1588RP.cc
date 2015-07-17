@@ -718,6 +718,8 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 
       }
 
+      int num_gases = root["Gases"][gas_type].size();
+
       // Define material properties for gaps
       for ( int MaterNum = 2; MaterNum <= number_of_new_materials; MaterNum += 2 )
       {
@@ -726,27 +728,20 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
         Material( MaterNum ).Roughness = MediumRough;
         Material( MaterNum ).ROnly = true;
         Material( MaterNum ).Thickness = gap_thickness;
-        Material( MaterNum ).NumberOfGasesInMixture = 1;
-        Material( MaterNum ).GasFract( 1 ) = 1.0;
+        Material( MaterNum ).NumberOfGasesInMixture = num_gases;
 
-
-        if ( gas_type == "AIR" ) Material( MaterNum ).GasType( 1 ) = 1;
-        if ( gas_type == "ARGON" ) Material( MaterNum ).GasType( 1 ) = 2;
-        if ( gas_type == "KRYPTON" ) Material( MaterNum ).GasType( 1 ) = 3;
-        if ( gas_type == "XENON" ) Material( MaterNum ).GasType( 1 ) = 4;
-        if ( gas_type == "VACUUM") {
-          Material( MaterNum ).GasType( 1 ) = 1;
-          Material( MaterNum ).Thickness = 0.00001;
+        for ( int gas = 1; gas <= num_gases; gas++)
+        {
+          Material( MaterNum ).GasFract( gas ) = root["Gases"][gas_type][gas-1]["Fraction"].asDouble();
+          Material( MaterNum ).GasWght( gas ) = root["Gases"][gas_type][gas-1]["Molecular Weight"].asDouble();
+          Material( MaterNum ).GasSpecHeatRatio( gas ) = root["Gases"][gas_type][gas-1]["Specific Heat Ratio"].asDouble();
+          for ( int ICoeff = 1; ICoeff <= 3; ++ICoeff ) {
+            Material( MaterNum ).GasCon( gas, ICoeff ) = root["Gases"][gas_type][gas-1]["Conductivity"][ICoeff-1].asDouble();
+            Material( MaterNum ).GasVis( gas, ICoeff ) = root["Gases"][gas_type][gas-1]["Viscosity"][ICoeff-1].asDouble();
+            Material( MaterNum ).GasCp( gas, ICoeff ) = root["Gases"][gas_type][gas-1]["Specific Heat"][ICoeff-1].asDouble();
+          }
         }
 
-        Material( MaterNum ).GasWght( 1 ) = GasWght( Material( MaterNum ).GasType( 1 ) );
-        Material( MaterNum ).GasSpecHeatRatio( 1 ) = GasSpecificHeatRatio( Material( MaterNum ).GasType( 1 ) );
-        for ( int ICoeff = 1; ICoeff <= 3; ++ICoeff ) {
-          Material( MaterNum ).GasCon( 1, ICoeff ) = GasCoeffsCon( Material( MaterNum ).GasType( 1 ), ICoeff );
-          Material( MaterNum ).GasVis( 1, ICoeff ) = GasCoeffsVis( Material( MaterNum ).GasType( 1 ), ICoeff );
-          Material( MaterNum ).GasCp( 1, ICoeff ) = GasCoeffsCp( Material( MaterNum ).GasType( 1 ), ICoeff );
-        }
-        // TODO write gas properties to output file
         Real64 DenomRGas = ( Material( MaterNum ).GasCon( 1, 1 ) + Material( MaterNum ).GasCon( 1, 2 ) * 300.0 + Material( MaterNum ).GasCon( 1, 3 ) * 90000.0 );
         NominalR( MaterNum ) = Material( MaterNum ).Thickness / DenomRGas;
 
@@ -925,10 +920,15 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
         output_1588["Glazing"]["Panes"][i]["Average Infrared Front Side Absorptance"] = Material( MaterNum ).AbsorpThermalFront;
       }
 
+      int num_gases = root["Gases"][gas_type].size();
+
       for ( int MaterNum = 2; MaterNum <= number_of_new_materials; MaterNum += 2 ) {
         int i = (MaterNum-2)/2;
-        output_1588["Glazing"]["Gaps"][i]["Gas"] = gas_type;
+        output_1588["Glazing"]["Gaps"][i]["Primary Gas"] = gas_type;
         output_1588["Glazing"]["Gaps"][i]["Thickness"] = gap_thickness;
+        for (int gas = 0; gas < num_gases; gas++) {
+          output_1588["Glazing"]["Gaps"][i]["Gases"][gas] = root["Gases"][gas_type][gas];
+        }
       }
 
       output_1588["Glazing"]["Center-of-Glass U-factor"] = u_cog;
