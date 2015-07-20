@@ -87,6 +87,7 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
   std::string db_1588_file_path;
   bool exists;
 
+  std::string RoutineName = "WindowASHRAE1588RP";
   CheckForActualFileName( db_1588_file_path_input, exists, db_1588_file_path );
   if ( ! exists ) {
     ShowSevereError( "WindowASHRAE1588RP: Could not locate the ASHRAE 1588 window database, expecting it as file name=" + db_1588_file_path_input );
@@ -181,13 +182,14 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
     // Read spectral data from database
 
     // Save Spectral Data
-    //int TotSpectralDataSave = TotSpectralData;
+    int TotSpectralDataSave = TotSpectralData;
     Array1D< SpectralDataProperties > SpectralDataSave;
     SpectralDataSave.allocate( TotSpectralData );
     SpectralDataSave = SpectralData;
     SpectralData.deallocate();
 
     Array1D< SpectralDataProperties > new_spectraldata;
+    int num_spectral_datasets;
 
     // Save Constructions -- The list will be deleted so that the only
     // construction is the one currently being set for any borrowed subroutines
@@ -668,6 +670,142 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
       QRadSWwinAbs.allocate(number_of_panes, 1);
       QRadSWwinAbsLayer.allocate(number_of_panes, 1);
 
+      // Create New Spectral Data objects
+      num_spectral_datasets = std::min(number_of_panes,2);
+      if ( new_spectraldata.size_ != (unsigned)num_spectral_datasets ) {
+        new_spectraldata.allocate(num_spectral_datasets);
+        SpectralData.allocate(num_spectral_datasets);
+        TotSpectralData = num_spectral_datasets;
+      }
+
+      SpectralData( 1 ).Name = construction_name + ":SPECTRALDATA1";
+      int sd1_num_wavelengths = root["Glazings"][thickness_key][glazing_coating][glazing_tint]["Wavelengths"].size();
+      SpectralData( 1 ).NumOfWavelengths = sd1_num_wavelengths;
+
+      SpectralData( 1 ).WaveLength.allocate( sd1_num_wavelengths ); // Wavelength (microns)
+      SpectralData( 1 ).Trans.allocate( sd1_num_wavelengths ); // Transmittance at normal incidence
+      SpectralData( 1 ).ReflFront.allocate( sd1_num_wavelengths ); // Front reflectance at normal incidence
+      SpectralData( 1 ).ReflBack.allocate( sd1_num_wavelengths ); // Back reflectance at normal incidence
+
+      for ( int i = 1; i <= sd1_num_wavelengths; i++ ) {
+        SpectralData( 1 ).WaveLength( i ) = root["Glazings"][thickness_key][glazing_coating][glazing_tint]["Wavelengths"][i-1].asDouble(); // Wavelengths
+        SpectralData( 1 ).Trans( i ) = root["Glazings"][thickness_key][glazing_coating][glazing_tint]["T"][i-1].asDouble();
+        // Following is needed since angular calculation in subr TransAndReflAtPhi
+        // fails for Trans = 0.0
+        if ( SpectralData( 1 ).Trans( i ) < 0.001 ) SpectralData( 1 ).Trans( i ) = 0.001;
+        SpectralData( 1 ).ReflFront( i ) = root["Glazings"][thickness_key][glazing_coating][glazing_tint]["Rf"][i-1].asDouble();
+        SpectralData( 1 ).ReflBack( i ) = root["Glazings"][thickness_key][glazing_coating][glazing_tint]["Rb"][i-1].asDouble();
+      }
+
+      // Check integrity of the spectral data
+      for ( int LamNum = 1; LamNum <= sd1_num_wavelengths; ++LamNum ) {
+        Real64 Lam = SpectralData( 1 ).WaveLength( LamNum );
+        Real64 Tau = SpectralData( 1 ).Trans( LamNum );
+        Real64 RhoF = SpectralData( 1 ).ReflFront( LamNum );
+        Real64 RhoB = SpectralData( 1 ).ReflBack( LamNum );
+        if ( LamNum < sd1_num_wavelengths ) {
+          if ( SpectralData( 1 ).WaveLength( LamNum + 1 ) <= Lam ) {
+            ErrorsFound = true;
+            ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 1 ).Name + "\" invalid set." );
+            ShowContinueError( "... Wavelengths not in increasing order. at wavelength#=" + TrimSigDigits( LamNum ) + ", value=[" + TrimSigDigits( Lam, 4 ) + "], next is [" + TrimSigDigits( SpectralData( Loop ).WaveLength( LamNum + 1 ), 4 ) + "]." );
+          }
+        }
+
+        if ( Lam < 0.1 || Lam > 4.0 ) {
+          ErrorsFound = true;
+          ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 1 ).Name + "\" invalid value." );
+          ShowContinueError( "... A wavelength is not in the range 0.1 to 4.0 microns; at wavelength#=" + TrimSigDigits( LamNum ) + ", value=[" + TrimSigDigits( Lam, 4 ) + "]." );
+        }
+
+        // TH 2/15/2011. CR 8343
+        // IGDB (International Glazing Database) does not meet the above strict restrictions.
+        //  Relax rules to allow directly use of spectral data from IGDB
+        if ( Tau > 1.01 ) {
+          ErrorsFound = true;
+          ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 1 ).Name + "\" invalid value." );
+          ShowContinueError( "... A transmittance is > 1.0; at wavelength#=" + TrimSigDigits( LamNum ) + ", value=[" + TrimSigDigits( Tau, 4 ) + "]." );
+        }
+
+        if ( RhoF < 0.0 || RhoF > 1.02 || RhoB < 0.0 || RhoB > 1.02 ) {
+          ErrorsFound = true;
+          ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 1 ).Name + "\" invalid value." );
+          ShowContinueError( "... A reflectance is < 0.0 or > 1.0; at wavelength#=" + TrimSigDigits( LamNum ) + ", RhoF value=[" + TrimSigDigits( RhoF, 4 ) + "]." );
+          ShowContinueError( "... A reflectance is < 0.0 or > 1.0; at wavelength#=" + TrimSigDigits( LamNum ) + ", RhoB value=[" + TrimSigDigits( RhoB, 4 ) + "]." );
+        }
+
+        if ( ( Tau + RhoF ) > 1.03 || ( Tau + RhoB ) > 1.03 ) {
+          ErrorsFound = true;
+          ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 1 ).Name + "\" invalid value." );
+          ShowContinueError( "... Transmittance + reflectance) > 1.0 for an entry; at wavelength#=" + TrimSigDigits( LamNum ) + ", value(Tau+RhoF)=[" + TrimSigDigits( ( Tau + RhoF ), 4 ) + "], value(Tau+RhoB)=[" + TrimSigDigits( ( Tau + RhoB ), 4 ) + "]." );
+        }
+
+      }
+
+      if ( num_spectral_datasets == 2 ) {
+        SpectralData( 2 ).Name = construction_name + ":SPECTRALDATA2";
+        int sd2_num_wavelengths = root["Glazings"][thickness_key]["NONE"]["CLEAR"]["Wavelengths"].size();
+        SpectralData( 2 ).NumOfWavelengths = sd2_num_wavelengths;
+
+        SpectralData( 2 ).WaveLength.allocate( sd1_num_wavelengths ); // Wavelength (microns)
+        SpectralData( 2 ).Trans.allocate( sd1_num_wavelengths ); // Transmittance at normal incidence
+        SpectralData( 2 ).ReflFront.allocate( sd1_num_wavelengths ); // Front reflectance at normal incidence
+        SpectralData( 2 ).ReflBack.allocate( sd1_num_wavelengths ); // Back reflectance at normal incidence
+
+        for ( int i = 1; i <= sd1_num_wavelengths; i++ ) {
+          SpectralData( 2 ).WaveLength( i ) = root["Glazings"][thickness_key]["NONE"]["CLEAR"]["Wavelengths"][i-1].asDouble();
+          SpectralData( 2 ).Trans( i ) = root["Glazings"][thickness_key]["NONE"]["CLEAR"]["T"][i-1].asDouble();
+          // Following is needed since angular calculation in subr TransAndReflAtPhi
+          // fails for Trans = 0.0
+          if ( SpectralData( 2 ).Trans( i ) < 0.001 ) SpectralData( 2 ).Trans( i ) = 0.001;
+          SpectralData( 2 ).ReflFront( i ) = root["Glazings"][thickness_key]["NONE"]["CLEAR"]["Rf"][i-1].asDouble();
+          SpectralData( 2 ).ReflBack( i ) = root["Glazings"][thickness_key]["NONE"]["CLEAR"]["Rb"][i-1].asDouble();
+        }
+
+        // Check integrity of the spectral data
+        for ( int LamNum = 1; LamNum <= sd2_num_wavelengths; ++LamNum ) {
+          Real64 Lam = SpectralData( 2 ).WaveLength( LamNum );
+          Real64 Tau = SpectralData( 2 ).Trans( LamNum );
+          Real64 RhoF = SpectralData( 2 ).ReflFront( LamNum );
+          Real64 RhoB = SpectralData( 2 ).ReflBack( LamNum );
+          if ( LamNum < sd2_num_wavelengths ) {
+            if ( SpectralData( 2 ).WaveLength( LamNum + 1 ) <= Lam ) {
+              ErrorsFound = true;
+              ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 2 ).Name + "\" invalid set." );
+              ShowContinueError( "... Wavelengths not in increasing order. at wavelength#=" + TrimSigDigits( LamNum ) + ", value=[" + TrimSigDigits( Lam, 4 ) + "], next is [" + TrimSigDigits( SpectralData( Loop ).WaveLength( LamNum + 1 ), 4 ) + "]." );
+            }
+          }
+
+          if ( Lam < 0.1 || Lam > 4.0 ) {
+            ErrorsFound = true;
+            ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 2 ).Name + "\" invalid value." );
+            ShowContinueError( "... A wavelength is not in the range 0.1 to 4.0 microns; at wavelength#=" + TrimSigDigits( LamNum ) + ", value=[" + TrimSigDigits( Lam, 4 ) + "]." );
+          }
+
+          // TH 2/15/2011. CR 8343
+          // IGDB (International Glazing Database) does not meet the above strict restrictions.
+          //  Relax rules to allow directly use of spectral data from IGDB
+          if ( Tau > 1.01 ) {
+            ErrorsFound = true;
+            ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 2 ).Name + "\" invalid value." );
+            ShowContinueError( "... A transmittance is > 1.0; at wavelength#=" + TrimSigDigits( LamNum ) + ", value=[" + TrimSigDigits( Tau, 4 ) + "]." );
+          }
+
+          if ( RhoF < 0.0 || RhoF > 1.02 || RhoB < 0.0 || RhoB > 1.02 ) {
+            ErrorsFound = true;
+            ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 2 ).Name + "\" invalid value." );
+            ShowContinueError( "... A reflectance is < 0.0 or > 1.0; at wavelength#=" + TrimSigDigits( LamNum ) + ", RhoF value=[" + TrimSigDigits( RhoF, 4 ) + "]." );
+            ShowContinueError( "... A reflectance is < 0.0 or > 1.0; at wavelength#=" + TrimSigDigits( LamNum ) + ", RhoB value=[" + TrimSigDigits( RhoB, 4 ) + "]." );
+          }
+
+          if ( ( Tau + RhoF ) > 1.03 || ( Tau + RhoB ) > 1.03 ) {
+            ErrorsFound = true;
+            ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 2 ).Name + "\" invalid value." );
+            ShowContinueError( "... Transmittance + reflectance) > 1.0 for an entry; at wavelength#=" + TrimSigDigits( LamNum ) + ", value(Tau+RhoF)=[" + TrimSigDigits( ( Tau + RhoF ), 4 ) + "], value(Tau+RhoB)=[" + TrimSigDigits( ( Tau + RhoB ), 4 ) + "]." );
+          }
+
+        }
+      }
+
       // Create New Material objects
       if ( new_materials.size_ != (unsigned)number_of_new_materials ) {
         new_materials.allocate( number_of_new_materials );
@@ -678,17 +816,18 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 
 
       // Define material properties for glazings
-      // TODO do something different for first and last pane if there is surface treatment
       for ( int MaterNum = 1; MaterNum <= number_of_new_materials; MaterNum += 2 )
       {
         std::string coating, tint;
         if (MaterNum == 1) {
           coating = glazing_coating;
           tint = glazing_tint;
+          Material( MaterNum ).GlassSpectralDataPtr = 1;
         }
         else {
           coating = "NONE";
           tint = "CLEAR";
+          Material( MaterNum ).GlassSpectralDataPtr = 2;
         }
         Material( MaterNum ).Group = WindowGlass;
         Material( MaterNum ).Name = construction_name + ":GLAZING" + std::to_string(MaterNum);
@@ -710,8 +849,6 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
         Material( MaterNum ).PoissonsRatio = 0.22;
         Material( MaterNum ).AbsorpThermal = Material( MaterNum ).AbsorpThermalBack;
         Material( MaterNum ).SolarDiffusing = false;
-
-        Material( MaterNum ).GlassSpectralDataPtr = 0; // TODO hook something up here
 
         NominalR( MaterNum ) = Material( MaterNum ).Thickness / Material( MaterNum ).Conductivity;
         Material( MaterNum ).Resistance = NominalR( MaterNum );
@@ -918,6 +1055,13 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
         output_1588["Glazing"]["Panes"][i]["Average Infrared Transmittance"] = Material( MaterNum ).TransThermal;
         output_1588["Glazing"]["Panes"][i]["Average Infrared Back Side Absorptance"] = Material( MaterNum ).AbsorpThermalBack;
         output_1588["Glazing"]["Panes"][i]["Average Infrared Front Side Absorptance"] = Material( MaterNum ).AbsorpThermalFront;
+        int spectral_data_index = Material( MaterNum ).GlassSpectralDataPtr;
+        for ( int lam = 1; lam <= SpectralData(spectral_data_index).NumOfWavelengths; lam++) {
+          output_1588["Glazing"]["Panes"][i]["Wavelengths"][lam-1] = SpectralData(spectral_data_index).WaveLength( lam );
+          output_1588["Glazing"]["Panes"][i]["Transmittance"][lam-1] = SpectralData(spectral_data_index).Trans( lam );
+          output_1588["Glazing"]["Panes"][i]["Reflectance (Front)"][lam-1] = SpectralData(spectral_data_index).ReflFront( lam );
+          output_1588["Glazing"]["Panes"][i]["Reflectance (Back)"][lam-1] = SpectralData(spectral_data_index).ReflBack( lam );
+        }
       }
 
       int num_gases = root["Gases"][gas_type].size();
@@ -959,9 +1103,9 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
       Real64 Seconds; // Elapsed Time Second Reporting
       gio::Fmt ETimeFmt( "(I2.2,'hr ',I2.2,'min ',F5.2,'sec')" );
       std::string NumWarnings = RoundSigDigits( TotalWarningErrors );
-    	strip( NumWarnings );
-    	std::string NumSevere = RoundSigDigits( TotalSevereErrors );
-    	strip( NumSevere );
+      strip( NumWarnings );
+      std::string NumSevere = RoundSigDigits( TotalSevereErrors );
+      strip( NumSevere );
 
       Time_Finish = epElapsedTime();
       if ( Time_Finish < Time_Start ) Time_Finish += 24.0 * 3600.0;
@@ -983,6 +1127,16 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
     // deallocate temporary arrays
     remove_dummy_variables();
 
+    // Restore Spectral Data list and copy in new spectral data
+    {
+      new_spectraldata = SpectralData;
+      SpectralData.deallocate();
+      TotSpectralData = TotSpectralDataSave;
+      SpectralData.allocate( TotSpectralData + num_spectral_datasets );
+      SpectralData( {1,TotSpectralData} ) = SpectralDataSave;
+      SpectralData( {TotSpectralData + 1, TotSpectralData + num_spectral_datasets}) = new_spectraldata;
+    }
+
     // Restore materials list and copy in new materials
     {
       // Apply dirt factor to outermost layer
@@ -990,6 +1144,13 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
         Material[0].GlassTransDirtFactor = 1.0;
       else
         Material[0].GlassTransDirtFactor = dirt_factor;
+
+      for (int i = 1; i <= (int)Material.size_; i++) {
+        if ( Material( i ).Group == WindowGlass ) {
+          Material( i ).GlassSpectralDataPtr += TotSpectralDataSave;
+        }
+      }
+
 
       new_materials = Material;
       new_nominal_R = NominalR;
