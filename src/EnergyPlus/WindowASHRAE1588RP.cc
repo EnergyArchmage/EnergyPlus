@@ -711,15 +711,6 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
           }
         }
 
-        if ( Lam < 0.1 || Lam > 4.0 ) {
-          ErrorsFound = true;
-          ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 1 ).Name + "\" invalid value." );
-          ShowContinueError( "... A wavelength is not in the range 0.1 to 4.0 microns; at wavelength#=" + TrimSigDigits( LamNum ) + ", value=[" + TrimSigDigits( Lam, 4 ) + "]." );
-        }
-
-        // TH 2/15/2011. CR 8343
-        // IGDB (International Glazing Database) does not meet the above strict restrictions.
-        //  Relax rules to allow directly use of spectral data from IGDB
         if ( Tau > 1.01 ) {
           ErrorsFound = true;
           ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 1 ).Name + "\" invalid value." );
@@ -775,15 +766,6 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
             }
           }
 
-          if ( Lam < 0.1 || Lam > 4.0 ) {
-            ErrorsFound = true;
-            ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 2 ).Name + "\" invalid value." );
-            ShowContinueError( "... A wavelength is not in the range 0.1 to 4.0 microns; at wavelength#=" + TrimSigDigits( LamNum ) + ", value=[" + TrimSigDigits( Lam, 4 ) + "]." );
-          }
-
-          // TH 2/15/2011. CR 8343
-          // IGDB (International Glazing Database) does not meet the above strict restrictions.
-          //  Relax rules to allow directly use of spectral data from IGDB
           if ( Tau > 1.01 ) {
             ErrorsFound = true;
             ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 2 ).Name + "\" invalid value." );
@@ -1093,37 +1075,6 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
       output_file.close();
     }
 
-    // TODO Find a way to trigger this explicitly for 1588-RP.
-    if ( stand_alone_analysis )
-    {
-      // Write to console
-      std::string Elapsed;
-      int Hours; // Elapsed Time Hour Reporting
-      int Minutes; // Elapsed Time Minute Reporting
-      Real64 Seconds; // Elapsed Time Second Reporting
-      gio::Fmt ETimeFmt( "(I2.2,'hr ',I2.2,'min ',F5.2,'sec')" );
-      std::string NumWarnings = RoundSigDigits( TotalWarningErrors );
-      strip( NumWarnings );
-      std::string NumSevere = RoundSigDigits( TotalSevereErrors );
-      strip( NumSevere );
-
-      Time_Finish = epElapsedTime();
-      if ( Time_Finish < Time_Start ) Time_Finish += 24.0 * 3600.0;
-      Elapsed_Time = Time_Finish - Time_Start;
-      Hours = Elapsed_Time / 3600.0;
-      Elapsed_Time -= Hours * 3600.0;
-      Minutes = Elapsed_Time / 60.0;
-      Elapsed_Time -= Minutes * 60.0;
-      Seconds = Elapsed_Time;
-      if ( Seconds < 0.0 ) Seconds = 0.0;
-      gio::write( Elapsed, ETimeFmt ) << Hours << Minutes << Seconds;
-      gio::write( "(A)" ) << ( "EnergyPlus ASHRAE 1588-RP Window Construction Generated Successfully-- Elapsed Time=" + Elapsed );
-      ShowMessage( "EnergyPlus ASHRAE 1588-RP Window Construction Generated Successfully-- " + NumWarnings + " Warning; " + NumSevere + " Severe Errors; Elapsed Time=" + Elapsed );
-
-      CloseOutOpenFiles();
-      exit (EXIT_SUCCESS);
-    }
-
     // deallocate temporary arrays
     remove_dummy_variables();
 
@@ -1135,6 +1086,10 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
       SpectralData.allocate( TotSpectralData + num_spectral_datasets );
       SpectralData( {1,TotSpectralData} ) = SpectralDataSave;
       SpectralData( {TotSpectralData + 1, TotSpectralData + num_spectral_datasets}) = new_spectraldata;
+
+      SpectralDataSave.deallocate();
+
+      TotSpectralData += num_spectral_datasets;
     }
 
     // Restore materials list and copy in new materials
@@ -1235,6 +1190,35 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 
   } // ...end of WindowASHRAE1588RP Constructions DO loop
 
+  if ( stand_alone_analysis )
+  {
+    // Write to console
+    std::string Elapsed;
+    int Hours; // Elapsed Time Hour Reporting
+    int Minutes; // Elapsed Time Minute Reporting
+    Real64 Seconds; // Elapsed Time Second Reporting
+    gio::Fmt ETimeFmt( "(I2.2,'hr ',I2.2,'min ',F5.2,'sec')" );
+    std::string NumWarnings = RoundSigDigits( TotalWarningErrors );
+    strip( NumWarnings );
+    std::string NumSevere = RoundSigDigits( TotalSevereErrors );
+    strip( NumSevere );
+
+    Time_Finish = epElapsedTime();
+    if ( Time_Finish < Time_Start ) Time_Finish += 24.0 * 3600.0;
+    Elapsed_Time = Time_Finish - Time_Start;
+    Hours = Elapsed_Time / 3600.0;
+    Elapsed_Time -= Hours * 3600.0;
+    Minutes = Elapsed_Time / 60.0;
+    Elapsed_Time -= Minutes * 60.0;
+    Seconds = Elapsed_Time;
+    if ( Seconds < 0.0 ) Seconds = 0.0;
+    gio::write( Elapsed, ETimeFmt ) << Hours << Minutes << Seconds;
+    gio::write( "(A)" ) << ( "EnergyPlus ASHRAE 1588-RP Window Construction(s) Generated Successfully-- Elapsed Time=" + Elapsed );
+    ShowMessage( "EnergyPlus ASHRAE 1588-RP Window Construction(s) Generated Successfully-- " + NumWarnings + " Warning; " + NumSevere + " Severe Errors; Elapsed Time=" + Elapsed );
+
+    CloseOutOpenFiles();
+    exit (EXIT_SUCCESS);
+  }
 
 }
 
