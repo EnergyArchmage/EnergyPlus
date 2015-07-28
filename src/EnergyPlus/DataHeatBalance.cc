@@ -63,7 +63,7 @@ namespace DataHeatBalance {
 	int MaxSolidWinLayers( 0 ); // Maximum number of solid layers in a window construction
 										// ** has to be big enough to hold no matter what window model
 										//    each window model should validate layers individually
-	int const MaxSpectralDataElements( 800 ); // Maximum number in Spectral Data arrays.
+	int const MaxSpectralDataElements( 1000 ); // Maximum number in Spectral Data arrays.
 
 	// Parameters to indicate material group type for use with the Material
 	// derived type (see below):

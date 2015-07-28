@@ -145,8 +145,19 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
   int TotWinASHRAE1588Constructs = GetNumObjectsFound( "Construction:WindowASHRAE1588RP" ); // Number of window constructions based on ASHRAE 1588RP
 
   CurrentModuleObject = "Construction:WindowASHRAE1588RP";
+
+  int old_progress_length = 0;
+  if (stand_alone_analysis) {
+    std::cout << "Generating ASHRAE 1588 Construction(s): ";
+  }
+
   for ( Loop = 1; Loop <= TotWinASHRAE1588Constructs; ++Loop ) { // Loop through all WindowASHRAE1588RP constructions.
 
+    if (stand_alone_analysis) {
+      std::string progress = std::to_string(Loop) + "/" + std::to_string(TotWinASHRAE1588Constructs);
+      std::cout << std::string(old_progress_length, '\b') << progress << std::flush;
+      old_progress_length = progress.size();
+    }
     //Get the object names for each construction from the input processor
     GetObjectItem( CurrentModuleObject, Loop, ConstructAlphas, ConstructNumAlpha, ConstructNumerics, ConstructNumNumeric, IOStat, lNumericFieldBlanks, lAlphaFieldBlanks, cAlphaFieldNames, cNumericFieldNames );
 
@@ -584,7 +595,6 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
     // This is where the iterative optimization loop will begin
     while (! target_matched)
     {
-
       // Get nearest thickness
       std::string thickness_key;
       if (glass_thickness <= std::stod(thickness_keys[0])/1000.0)
@@ -592,7 +602,7 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
       else if (glass_thickness >= std::stod(thickness_keys.back())/1000.0)
         thickness_key = thickness_keys.back();
       else {
-        for (std::vector< std::string >::const_iterator i = thickness_keys.begin(); i != thickness_keys.end(); ++i) {
+        for (std::vector< std::string >::const_iterator i = thickness_keys.begin(); i != --thickness_keys.end(); ++i) {
           double first = std::stod(*i)/1000.0;
           double second = std::stod(*std::next(i))/1000.0;
           if (glass_thickness >= first && glass_thickness <= second) {
@@ -610,15 +620,20 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
       Real64 frame_u_factor;
       std::string fenestration_category = root["Types"][fenestration_type]["Category"].asString();
       if ( root["Spacers"][spacer_type]["Metal"].asBool() ) {
-        frame_u_factor = root["Frames"][frame_material]["Metal Spacer"][fenestration_category][std::max(number_of_panes,3)-1].asDouble();
+        frame_u_factor = root["Frames"][frame_material]["Metal Spacer"][fenestration_category][std::min(number_of_panes,3)-1].asDouble();
       }
       else {
-        frame_u_factor = root["Frames"][frame_material]["Non-Metal Spacer"][fenestration_category][std::max(number_of_panes,3)-1].asDouble();
+        frame_u_factor = root["Frames"][frame_material]["Non-Metal Spacer"][fenestration_category][std::min(number_of_panes,3)-1].asDouble();
       }
 
       Real64 assumed_h_o = 30;  // W/m2-K
       Real64 assumed_h_i = 8;  // W/m2-K
-      frame_conductance = 1/(1/frame_u_factor - (1/assumed_h_o + 1/assumed_h_i));
+      if ( (1/assumed_h_o + 1/assumed_h_i) >= (1/frame_u_factor) ) {
+        frame_conductance = 9999999;
+      }
+      else {
+        frame_conductance = 1/(1/frame_u_factor - (1/assumed_h_o + 1/assumed_h_i));
+      }
 
       fenestration_width = root["Types"][fenestration_type]["Width"].asDouble();
       fenestration_height = root["Types"][fenestration_type]["Height"].asDouble();
@@ -682,6 +697,11 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
       int sd1_num_wavelengths = root["Glazings"][thickness_key][glazing_coating][glazing_tint]["Wavelengths"].size();
       SpectralData( 1 ).NumOfWavelengths = sd1_num_wavelengths;
 
+      SpectralData( 1 ).WaveLength.deallocate( );
+      SpectralData( 1 ).Trans.deallocate( );
+      SpectralData( 1 ).ReflFront.deallocate( );
+      SpectralData( 1 ).ReflBack.deallocate( );
+
       SpectralData( 1 ).WaveLength.allocate( sd1_num_wavelengths ); // Wavelength (microns)
       SpectralData( 1 ).Trans.allocate( sd1_num_wavelengths ); // Transmittance at normal incidence
       SpectralData( 1 ).ReflFront.allocate( sd1_num_wavelengths ); // Front reflectance at normal incidence
@@ -737,12 +757,17 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
         int sd2_num_wavelengths = root["Glazings"][thickness_key]["NONE"]["CLEAR"]["Wavelengths"].size();
         SpectralData( 2 ).NumOfWavelengths = sd2_num_wavelengths;
 
-        SpectralData( 2 ).WaveLength.allocate( sd1_num_wavelengths ); // Wavelength (microns)
-        SpectralData( 2 ).Trans.allocate( sd1_num_wavelengths ); // Transmittance at normal incidence
-        SpectralData( 2 ).ReflFront.allocate( sd1_num_wavelengths ); // Front reflectance at normal incidence
-        SpectralData( 2 ).ReflBack.allocate( sd1_num_wavelengths ); // Back reflectance at normal incidence
+        SpectralData( 2 ).WaveLength.deallocate( );
+        SpectralData( 2 ).Trans.deallocate( );
+        SpectralData( 2 ).ReflFront.deallocate( );
+        SpectralData( 2 ).ReflBack.deallocate( );
 
-        for ( int i = 1; i <= sd1_num_wavelengths; i++ ) {
+        SpectralData( 2 ).WaveLength.allocate( sd2_num_wavelengths ); // Wavelength (microns)
+        SpectralData( 2 ).Trans.allocate( sd2_num_wavelengths ); // Transmittance at normal incidence
+        SpectralData( 2 ).ReflFront.allocate( sd2_num_wavelengths ); // Front reflectance at normal incidence
+        SpectralData( 2 ).ReflBack.allocate( sd2_num_wavelengths ); // Back reflectance at normal incidence
+
+        for ( int i = 1; i <= sd2_num_wavelengths; i++ ) {
           SpectralData( 2 ).WaveLength( i ) = root["Glazings"][thickness_key]["NONE"]["CLEAR"]["Wavelengths"][i-1].asDouble();
           SpectralData( 2 ).Trans( i ) = root["Glazings"][thickness_key]["NONE"]["CLEAR"]["T"][i-1].asDouble();
           // Following is needed since angular calculation in subr TransAndReflAtPhi
@@ -946,7 +971,7 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
       // Calculate total U-factor
       calc_window_performance(in_air_temp, out_air_temp, wind_speed, solar_incident);
 
-      u_factor = -WinHeatGain(1)/(Surface( 1 ).Area*(in_air_temp - out_air_temp));
+      u_factor = -WinHeatGain(1)/(fenestration_area*(in_air_temp - out_air_temp));
 
       // Set up SHGC conditions
       in_air_temp = s_indoor_temp;
@@ -960,10 +985,10 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
       Real64 q_total = WinHeatGain(1);
 
       // NFRC 201-2014 Equation 8-7
-      Real64 q_U = u_factor*Surface( 1 ).Area*(out_air_temp - in_air_temp);
+      Real64 q_U = u_factor*fenestration_area*(out_air_temp - in_air_temp);
 
       // NFRC 201-2014 Equation 8-2
-      shgc = (q_total - q_U)/(Surface( 1 ).Area*solar_incident);
+      shgc = (q_total - q_U)/(fenestration_area*solar_incident);
 
       Real64 non_opaque_area_fraction = Surface( 1 ).Area/fenestration_area;
       vt = POLYF(1.0,Construct( 1 ).TransVisBeamCoef( 1 ))*non_opaque_area_fraction;
@@ -1192,6 +1217,8 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 
   if ( stand_alone_analysis )
   {
+    std::cout << std::endl;
+
     // Write to console
     std::string Elapsed;
     int Hours; // Elapsed Time Hour Reporting
