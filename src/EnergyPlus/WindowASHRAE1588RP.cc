@@ -98,18 +98,11 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 
   Json::Value root = read_1588_database(db_1588_file_path);
 
-  // Get the thickness keys from the database
-  std::vector < std::string > thickness_keys = root["Glazings"].getMemberNames();
-  std::sort(thickness_keys.begin(), thickness_keys.end(),
-    [](const std::string &a, const std::string &b) -> bool {
-      return std::stod(a) < std::stod(b);
-    });
-
   // Get list of Coatings from the database
-  std::vector < std::string > coating_keys = root["Glazings"][thickness_keys[0]].getMemberNames();
+  std::vector < std::string > coating_keys = root["Coatings"].getMemberNames();
 
   // Get list of Tints from the database
-  std::vector < std::string > tint_keys = root["Glazings"][thickness_keys[0]][coating_keys[0]].getMemberNames();
+  std::vector < std::string > tint_keys = root["Substrates"].getMemberNames();
 
   // Get list of Fenestration Types from the database
   std::vector < std::string > type_keys = root["Types"].getMemberNames();
@@ -133,6 +126,8 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
   Real64 s_outdoor_temp = root["Tests"]["SHGC"]["Outdoor Temperature"].asDouble();
   Real64 s_wind_speed = root["Tests"]["SHGC"]["Wind Speed"].asDouble();
   Real64 s_solar = root["Tests"]["SHGC"]["Solar Incidence"].asDouble();
+
+	int spectral_data_size = root["Wavelengths"].size();
 
   int ConstructNumAlpha; // Number of construction alpha names being passed
   int ConstructNumNumeric; // dummy variable for properties being passed
@@ -595,24 +590,6 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
     // This is where the iterative optimization loop will begin
     while (! target_matched)
     {
-      // Get nearest thickness
-      std::string thickness_key;
-      if (glass_thickness <= std::stod(thickness_keys[0])/1000.0)
-        thickness_key = thickness_keys[0];
-      else if (glass_thickness >= std::stod(thickness_keys.back())/1000.0)
-        thickness_key = thickness_keys.back();
-      else {
-        for (std::vector< std::string >::const_iterator i = thickness_keys.begin(); i != --thickness_keys.end(); ++i) {
-          double first = std::stod(*i)/1000.0;
-          double second = std::stod(*std::next(i))/1000.0;
-          if (glass_thickness >= first && glass_thickness <= second) {
-            if (glass_thickness - first < second - glass_thickness)
-              thickness_key = *i;
-            else
-              thickness_key = *std::next(i);
-          }
-        }
-      }
 
       frame_solar_absorptivity = root["Types"][fenestration_type]["Frame Absorptivity"].asDouble();
       frame_visible_absorptivity = root["Types"][fenestration_type]["Frame Absorptivity"].asDouble();
@@ -694,36 +671,55 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
       }
 
       SpectralData( 1 ).Name = construction_name + ":SPECTRALDATA1";
-      int sd1_num_wavelengths = root["Glazings"][thickness_key][glazing_coating][glazing_tint]["Wavelengths"].size();
-      SpectralData( 1 ).NumOfWavelengths = sd1_num_wavelengths;
+      SpectralData( 1 ).NumOfWavelengths = spectral_data_size;
 
       SpectralData( 1 ).WaveLength.deallocate( );
       SpectralData( 1 ).Trans.deallocate( );
       SpectralData( 1 ).ReflFront.deallocate( );
       SpectralData( 1 ).ReflBack.deallocate( );
 
-      SpectralData( 1 ).WaveLength.allocate( sd1_num_wavelengths ); // Wavelength (microns)
-      SpectralData( 1 ).Trans.allocate( sd1_num_wavelengths ); // Transmittance at normal incidence
-      SpectralData( 1 ).ReflFront.allocate( sd1_num_wavelengths ); // Front reflectance at normal incidence
-      SpectralData( 1 ).ReflBack.allocate( sd1_num_wavelengths ); // Back reflectance at normal incidence
+      SpectralData( 1 ).WaveLength.allocate( spectral_data_size ); // Wavelength (microns)
+      SpectralData( 1 ).Trans.allocate( spectral_data_size ); // Transmittance at normal incidence
+      SpectralData( 1 ).ReflFront.allocate( spectral_data_size ); // Front reflectance at normal incidence
+      SpectralData( 1 ).ReflBack.allocate( spectral_data_size ); // Back reflectance at normal incidence
 
-      for ( int i = 1; i <= sd1_num_wavelengths; i++ ) {
-        SpectralData( 1 ).WaveLength( i ) = root["Glazings"][thickness_key][glazing_coating][glazing_tint]["Wavelengths"][i-1].asDouble(); // Wavelengths
-        SpectralData( 1 ).Trans( i ) = root["Glazings"][thickness_key][glazing_coating][glazing_tint]["T"][i-1].asDouble();
+      for ( int i = 1; i <= spectral_data_size; i++ ) {
+        SpectralData( 1 ).WaveLength( i ) = root["Wavelengths"][i-1].asDouble(); // Wavelengths
+
+        // Construct spectral data from component properties
+        Real64 tau_s = root["Substrates"][glazing_tint]["tau_s"][i-1].asDouble();
+				tau_s = std::pow(tau_s,glass_thickness/root["Substrates"][glazing_tint]["Thickness"].asDouble());
+        Real64 r_s = root["Substrates"][glazing_tint]["r_s"][i-1].asDouble();
+				Real64 t_c, rf_c, rb_c;
+
+        if (glazing_tint != "NONE") {
+          t_c = root["Coatings"][glazing_coating]["t_c"][i-1].asDouble();
+					rf_c = root["Coatings"][glazing_coating]["rf_c"][i-1].asDouble();
+					rb_c = root["Coatings"][glazing_coating]["rb_c"][i-1].asDouble();
+				}
+				else {
+					t_c = 1 - r_s;
+					rf_c = r_s;
+					rb_c = r_s;
+				}
+
+        SpectralData( 1 ).Trans( i ) = ((1-r_s)*t_c*tau_s)/(1 - r_s*rf_c*tau_s*tau_s);
         // Following is needed since angular calculation in subr TransAndReflAtPhi
         // fails for Trans = 0.0
-        if ( SpectralData( 1 ).Trans( i ) < 0.001 ) SpectralData( 1 ).Trans( i ) = 0.001;
-        SpectralData( 1 ).ReflFront( i ) = root["Glazings"][thickness_key][glazing_coating][glazing_tint]["Rf"][i-1].asDouble();
-        SpectralData( 1 ).ReflBack( i ) = root["Glazings"][thickness_key][glazing_coating][glazing_tint]["Rb"][i-1].asDouble();
+        if ( SpectralData( 1 ).Trans( i ) < 0.001 ) {
+					SpectralData( 1 ).Trans( i ) = 0.001;
+				}
+        SpectralData( 1 ).ReflFront( i ) = r_s + (pow2(1 - r_s)*rf_c*tau_s*tau_s)/(1 - r_s*rf_c*tau_s*tau_s);
+        SpectralData( 1 ).ReflBack( i ) = rb_c + (t_c*t_c*r_s*tau_s*tau_s)/(1 - r_s*rf_c*tau_s*tau_s);
       }
 
       // Check integrity of the spectral data
-      for ( int LamNum = 1; LamNum <= sd1_num_wavelengths; ++LamNum ) {
+      for ( int LamNum = 1; LamNum <= spectral_data_size; ++LamNum ) {
         Real64 Lam = SpectralData( 1 ).WaveLength( LamNum );
         Real64 Tau = SpectralData( 1 ).Trans( LamNum );
         Real64 RhoF = SpectralData( 1 ).ReflFront( LamNum );
         Real64 RhoB = SpectralData( 1 ).ReflBack( LamNum );
-        if ( LamNum < sd1_num_wavelengths ) {
+        if ( LamNum < spectral_data_size ) {
           if ( SpectralData( 1 ).WaveLength( LamNum + 1 ) <= Lam ) {
             ErrorsFound = true;
             ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 1 ).Name + "\" invalid set." );
@@ -754,36 +750,46 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 
       if ( num_spectral_datasets == 2 ) {
         SpectralData( 2 ).Name = construction_name + ":SPECTRALDATA2";
-        int sd2_num_wavelengths = root["Glazings"][thickness_key]["NONE"]["CLEAR"]["Wavelengths"].size();
-        SpectralData( 2 ).NumOfWavelengths = sd2_num_wavelengths;
+        SpectralData( 2 ).NumOfWavelengths = spectral_data_size;
 
         SpectralData( 2 ).WaveLength.deallocate( );
         SpectralData( 2 ).Trans.deallocate( );
         SpectralData( 2 ).ReflFront.deallocate( );
         SpectralData( 2 ).ReflBack.deallocate( );
 
-        SpectralData( 2 ).WaveLength.allocate( sd2_num_wavelengths ); // Wavelength (microns)
-        SpectralData( 2 ).Trans.allocate( sd2_num_wavelengths ); // Transmittance at normal incidence
-        SpectralData( 2 ).ReflFront.allocate( sd2_num_wavelengths ); // Front reflectance at normal incidence
-        SpectralData( 2 ).ReflBack.allocate( sd2_num_wavelengths ); // Back reflectance at normal incidence
+        SpectralData( 2 ).WaveLength.allocate( spectral_data_size ); // Wavelength (microns)
+        SpectralData( 2 ).Trans.allocate( spectral_data_size ); // Transmittance at normal incidence
+        SpectralData( 2 ).ReflFront.allocate( spectral_data_size ); // Front reflectance at normal incidence
+        SpectralData( 2 ).ReflBack.allocate( spectral_data_size ); // Back reflectance at normal incidence
 
-        for ( int i = 1; i <= sd2_num_wavelengths; i++ ) {
-          SpectralData( 2 ).WaveLength( i ) = root["Glazings"][thickness_key]["NONE"]["CLEAR"]["Wavelengths"][i-1].asDouble();
-          SpectralData( 2 ).Trans( i ) = root["Glazings"][thickness_key]["NONE"]["CLEAR"]["T"][i-1].asDouble();
+        for ( int i = 1; i <= spectral_data_size; i++ ) {
+          SpectralData( 2 ).WaveLength( i ) = SpectralData( 1 ).WaveLength( i ); // Wavelengths
+
+          // Construct spectral data from component properties
+          Real64 tau_s = root["Substrates"]["CLEAR"]["tau_s"][i-1].asDouble();
+  				tau_s = std::pow(tau_s,glass_thickness/root["Substrates"]["CLEAR"]["Thickness"].asDouble());
+          Real64 r_s = root["Substrates"]["CLEAR"]["r_s"][i-1].asDouble();
+  				Real64 t_c = 1 - r_s;
+  				Real64 rf_c = r_s;
+  				Real64 rb_c = r_s;
+
+          SpectralData( 2 ).Trans( i ) = ((1-r_s)*t_c*tau_s)/(1 - r_s*rf_c*tau_s*tau_s);
           // Following is needed since angular calculation in subr TransAndReflAtPhi
           // fails for Trans = 0.0
-          if ( SpectralData( 2 ).Trans( i ) < 0.001 ) SpectralData( 2 ).Trans( i ) = 0.001;
-          SpectralData( 2 ).ReflFront( i ) = root["Glazings"][thickness_key]["NONE"]["CLEAR"]["Rf"][i-1].asDouble();
-          SpectralData( 2 ).ReflBack( i ) = root["Glazings"][thickness_key]["NONE"]["CLEAR"]["Rb"][i-1].asDouble();
+          if ( SpectralData( 2 ).Trans( i ) < 0.001 ) {
+            SpectralData( 2 ).Trans( i ) = 0.001;
+          }
+          SpectralData( 2 ).ReflFront( i ) = r_s + (pow2(1 - r_s)*rf_c*tau_s*tau_s)/(1 - r_s*rf_c*tau_s*tau_s);
+          SpectralData( 2 ).ReflBack( i ) = rb_c + (t_c*t_c*r_s*tau_s*tau_s)/(1 - r_s*rf_c*tau_s*tau_s);
         }
 
         // Check integrity of the spectral data
-        for ( int LamNum = 1; LamNum <= sd2_num_wavelengths; ++LamNum ) {
+        for ( int LamNum = 1; LamNum <= spectral_data_size; ++LamNum ) {
           Real64 Lam = SpectralData( 2 ).WaveLength( LamNum );
           Real64 Tau = SpectralData( 2 ).Trans( LamNum );
           Real64 RhoF = SpectralData( 2 ).ReflFront( LamNum );
           Real64 RhoB = SpectralData( 2 ).ReflBack( LamNum );
-          if ( LamNum < sd2_num_wavelengths ) {
+          if ( LamNum < spectral_data_size ) {
             if ( SpectralData( 2 ).WaveLength( LamNum + 1 ) <= Lam ) {
               ErrorsFound = true;
               ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 2 ).Name + "\" invalid set." );
@@ -841,15 +847,9 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
         Material( MaterNum ).Roughness = VerySmooth;
         Material( MaterNum ).ROnly = true;
         Material( MaterNum ).Thickness = glass_thickness;
-        Material( MaterNum ).Trans = root["Glazings"][thickness_key][coating][tint]["Tsol"].asDouble();
-        Material( MaterNum ).ReflectSolBeamFront = root["Glazings"][thickness_key][coating][tint]["Rfsol"].asDouble();
-        Material( MaterNum ).ReflectSolBeamBack = root["Glazings"][thickness_key][coating][tint]["Rbsol"].asDouble();
-        Material( MaterNum ).TransVis = root["Glazings"][thickness_key][coating][tint]["Tvis"].asDouble();
-        Material( MaterNum ).ReflectVisBeamFront = root["Glazings"][thickness_key][coating][tint]["Rfvis"].asDouble();
-        Material( MaterNum ).ReflectVisBeamBack = root["Glazings"][thickness_key][coating][tint]["Rbvis"].asDouble();
         Material( MaterNum ).TransThermal = 0.0;
-        Material( MaterNum ).AbsorpThermalFront = root["Glazings"][thickness_key][coating][tint]["ef"].asDouble();
-        Material( MaterNum ).AbsorpThermalBack = root["Glazings"][thickness_key][coating][tint]["eb"].asDouble();
+        Material( MaterNum ).AbsorpThermalFront = root["Coatings"][coating]["Emissivity (Front)"].asDouble();
+        Material( MaterNum ).AbsorpThermalBack = root["Coatings"][coating]["Emissivity (Back)"].asDouble();
         Material( MaterNum ).Conductivity = 1.0;
         Material( MaterNum ).GlassTransDirtFactor = 1.0;  // Hold at unity to find match and then apply to outside layer
         Material( MaterNum ).YoungModulus = 7.2e10;
@@ -1041,6 +1041,12 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
       output_1588["Glazing"]["Number of Panes"] = number_of_panes;
       output_1588["Glazing"]["Area"] = glazing_area;
 
+			// Since wavelengths are the same for each spectral dataset, they only need
+		  // to appear once in the output file.
+      for ( int lam = 1; lam <= spectral_data_size; lam++) {
+      	output_1588["Glazing"]["Wavelengths"][lam-1] = SpectralData( 1 ).WaveLength( lam );
+      }
+
       for ( int MaterNum = 1; MaterNum <= number_of_new_materials; MaterNum += 2 ) {
         int i = (MaterNum-1)/2;
         output_1588["Glazing"]["Panes"][i]["Thickness"] = Material( MaterNum ).Thickness;
@@ -1064,7 +1070,6 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
         output_1588["Glazing"]["Panes"][i]["Average Infrared Front Side Absorptance"] = Material( MaterNum ).AbsorpThermalFront;
         int spectral_data_index = Material( MaterNum ).GlassSpectralDataPtr;
         for ( int lam = 1; lam <= SpectralData(spectral_data_index).NumOfWavelengths; lam++) {
-          output_1588["Glazing"]["Panes"][i]["Wavelengths"][lam-1] = SpectralData(spectral_data_index).WaveLength( lam );
           output_1588["Glazing"]["Panes"][i]["Transmittance"][lam-1] = SpectralData(spectral_data_index).Trans( lam );
           output_1588["Glazing"]["Panes"][i]["Reflectance (Front)"][lam-1] = SpectralData(spectral_data_index).ReflFront( lam );
           output_1588["Glazing"]["Panes"][i]["Reflectance (Back)"][lam-1] = SpectralData(spectral_data_index).ReflBack( lam );
