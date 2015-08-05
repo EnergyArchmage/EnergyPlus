@@ -1059,21 +1059,71 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
           output_1588["Glazing"]["Panes"][i]["Coating"] = "NONE";
           output_1588["Glazing"]["Panes"][i]["Tint"] = "CLEAR";
         }
-        output_1588["Glazing"]["Panes"][i]["Average Solar Transmittance"] = Material( MaterNum ).Trans;
-        output_1588["Glazing"]["Panes"][i]["Average Solar Back Side Reflectance"] = Material( MaterNum ).ReflectSolBeamBack;
-        output_1588["Glazing"]["Panes"][i]["Average Solar Front Side Reflectance"] = Material( MaterNum ).ReflectSolBeamFront;
-        output_1588["Glazing"]["Panes"][i]["Average Visible Transmittance"] = Material( MaterNum ).TransVis;
-        output_1588["Glazing"]["Panes"][i]["Average Visible Back Side Reflectance"] = Material( MaterNum ).ReflectVisBeamBack;
-        output_1588["Glazing"]["Panes"][i]["Average Visible Front Side Reflectance"] = Material( MaterNum ).ReflectVisBeamFront;
         output_1588["Glazing"]["Panes"][i]["Average Infrared Transmittance"] = Material( MaterNum ).TransThermal;
         output_1588["Glazing"]["Panes"][i]["Average Infrared Back Side Absorptance"] = Material( MaterNum ).AbsorpThermalBack;
         output_1588["Glazing"]["Panes"][i]["Average Infrared Front Side Absorptance"] = Material( MaterNum ).AbsorpThermalFront;
+
         int spectral_data_index = Material( MaterNum ).GlassSpectralDataPtr;
-        for ( int lam = 1; lam <= SpectralData(spectral_data_index).NumOfWavelengths; lam++) {
-          output_1588["Glazing"]["Panes"][i]["Transmittance"][lam-1] = SpectralData(spectral_data_index).Trans( lam );
-          output_1588["Glazing"]["Panes"][i]["Reflectance (Front)"][lam-1] = SpectralData(spectral_data_index).ReflFront( lam );
-          output_1588["Glazing"]["Panes"][i]["Reflectance (Back)"][lam-1] = SpectralData(spectral_data_index).ReflBack( lam );
+
+				Real64 TransSolUp = 0.0,
+							 TransVisUp = 0.0,
+							 RefFrontSolUp = 0.0,
+							 RefFrontVisUp = 0.0,
+							 RefBackSolUp = 0.0,
+							 RefBackVisUp = 0.0,
+							 SolDown = 0.0, 
+							 VisDown = 0.0;
+
+        for ( int lam = 1; lam <= spectral_data_size; lam++) {
+          Real64 Trans = SpectralData(spectral_data_index).Trans( lam );
+          Real64 RefFront = SpectralData(spectral_data_index).ReflFront( lam );
+          Real64 RefBack = SpectralData(spectral_data_index).ReflBack( lam );
+          output_1588["Glazing"]["Panes"][i]["Transmittance"][lam-1] = Trans;
+          output_1588["Glazing"]["Panes"][i]["Reflectance (Front)"][lam-1] = RefFront;
+          output_1588["Glazing"]["Panes"][i]["Reflectance (Back)"][lam-1] = RefBack;
+
+          // Numeric integration of average properties. Follows same method as WindowManager, but uses consistent wavelengths.
+					if (lam != spectral_data_size) {
+						// Spectral Properties
+						Real64 TransNext = SpectralData(spectral_data_index).Trans( lam + 1 );
+						Real64 RefFrontNext = SpectralData(spectral_data_index).ReflFront( lam + 1 );
+	          Real64 RefBackNext = SpectralData(spectral_data_index).ReflBack( lam + 1);
+
+						// Wavelengths
+						Real64 Wl = SpectralData(spectral_data_index).WaveLength( lam );
+						Real64 WlNext = SpectralData(spectral_data_index).WaveLength( lam + 1 );
+
+						// Solar Spectrum and Photopic Response
+						Real64 SS = root["Solar Spectrum"][lam - 1].asDouble();
+						Real64 SSNext = root["Solar Spectrum"][lam].asDouble();
+
+						Real64 PR = root["Photopic Response"][lam - 1].asDouble();
+						Real64 PRNext = root["Photopic Response"][lam].asDouble();
+
+						Real64 eSol = (WlNext - Wl)*0.5*(SS + SSNext);
+						Real64 eVis = (WlNext - Wl)*0.5*(SS + SSNext)*0.5*(PR + PRNext);
+
+						TransSolUp += eSol*0.5*(Trans + TransNext);
+						RefFrontSolUp += eSol*0.5*(RefFront + RefFrontNext);
+						RefBackSolUp += eSol*0.5*(RefBack + RefBackNext);
+
+						TransVisUp += eVis*0.5*(Trans + TransNext);
+						RefFrontVisUp += eVis*0.5*(RefFront + RefFrontNext);
+						RefBackVisUp += eVis*0.5*(RefBack + RefBackNext);
+
+						SolDown += eSol;
+						VisDown += eVis;
+
+					}
+
         }
+
+        output_1588["Glazing"]["Panes"][i]["Average Solar Transmittance"] = TransSolUp/SolDown;
+				output_1588["Glazing"]["Panes"][i]["Average Solar Front Side Reflectance"] = RefFrontSolUp/SolDown;
+        output_1588["Glazing"]["Panes"][i]["Average Solar Back Side Reflectance"] = RefBackSolUp/SolDown;
+        output_1588["Glazing"]["Panes"][i]["Average Visible Transmittance"] = TransVisUp/VisDown;
+				output_1588["Glazing"]["Panes"][i]["Average Visible Front Side Reflectance"] = RefFrontVisUp/VisDown;
+        output_1588["Glazing"]["Panes"][i]["Average Visible Back Side Reflectance"] = RefBackVisUp/VisDown;
       }
 
       int num_gases = root["Gases"][gas_type].size();
