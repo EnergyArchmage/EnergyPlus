@@ -692,7 +692,7 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
         Real64 r_s = root["Substrates"][glazing_tint]["r_s"][i-1].asDouble();
 				Real64 t_c, rf_c, rb_c;
 
-        if (glazing_tint != "NONE") {
+        if (glazing_coating != "NONE") {
           t_c = root["Coatings"][glazing_coating]["t_c"][i-1].asDouble();
 					rf_c = root["Coatings"][glazing_coating]["rf_c"][i-1].asDouble();
 					rb_c = root["Coatings"][glazing_coating]["rb_c"][i-1].asDouble();
@@ -867,7 +867,7 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
       // Define material properties for gaps
       for ( int MaterNum = 2; MaterNum <= number_of_new_materials; MaterNum += 2 )
       {
-        Material( MaterNum ).Group = WindowGas;
+        Material( MaterNum ).Group = WindowGasMixture;
         Material( MaterNum ).Name = construction_name + ":GAP" + std::to_string(MaterNum);
         Material( MaterNum ).Roughness = MediumRough;
         Material( MaterNum ).ROnly = true;
@@ -876,13 +876,14 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 
         for ( int gas = 1; gas <= num_gases; gas++)
         {
+          Material( MaterNum ).GasType( gas ) = 0;
           Material( MaterNum ).GasFract( gas ) = root["Gases"][gas_type][gas-1]["Fraction"].asDouble();
           Material( MaterNum ).GasWght( gas ) = root["Gases"][gas_type][gas-1]["Molecular Weight"].asDouble();
           Material( MaterNum ).GasSpecHeatRatio( gas ) = root["Gases"][gas_type][gas-1]["Specific Heat Ratio"].asDouble();
           for ( int ICoeff = 1; ICoeff <= 3; ++ICoeff ) {
-            Material( MaterNum ).GasCon( gas, ICoeff ) = root["Gases"][gas_type][gas-1]["Conductivity"][ICoeff-1].asDouble();
-            Material( MaterNum ).GasVis( gas, ICoeff ) = root["Gases"][gas_type][gas-1]["Viscosity"][ICoeff-1].asDouble();
-            Material( MaterNum ).GasCp( gas, ICoeff ) = root["Gases"][gas_type][gas-1]["Specific Heat"][ICoeff-1].asDouble();
+            Material( MaterNum ).GasCon( ICoeff, gas ) = root["Gases"][gas_type][gas-1]["Conductivity"][ICoeff-1].asDouble();
+            Material( MaterNum ).GasVis( ICoeff, gas ) = root["Gases"][gas_type][gas-1]["Viscosity"][ICoeff-1].asDouble();
+            Material( MaterNum ).GasCp( ICoeff, gas ) = root["Gases"][gas_type][gas-1]["Specific Heat"][ICoeff-1].asDouble();
           }
         }
 
@@ -1071,7 +1072,7 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 							 RefFrontVisUp = 0.0,
 							 RefBackSolUp = 0.0,
 							 RefBackVisUp = 0.0,
-							 SolDown = 0.0, 
+							 SolDown = 0.0,
 							 VisDown = 0.0;
 
         for ( int lam = 1; lam <= spectral_data_size; lam++) {
@@ -1131,9 +1132,17 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
       for ( int MaterNum = 2; MaterNum <= number_of_new_materials; MaterNum += 2 ) {
         int i = (MaterNum-2)/2;
         output_1588["Glazing"]["Gaps"][i]["Primary Gas"] = gas_type;
-        output_1588["Glazing"]["Gaps"][i]["Thickness"] = gap_thickness;
-        for (int gas = 0; gas < num_gases; gas++) {
-          output_1588["Glazing"]["Gaps"][i]["Mixture"][gas] = root["Gases"][gas_type][gas];
+        output_1588["Glazing"]["Gaps"][i]["Thickness"] = Material( MaterNum ).Thickness;
+        for (int gas = 1; gas <= num_gases; gas++) {
+          output_1588["Glazing"]["Gaps"][i]["Mixture"][gas-1]["Gas"] = root["Gases"][gas_type][gas-1]["Gas"];
+          output_1588["Glazing"]["Gaps"][i]["Mixture"][gas-1]["Fraction"] = Material( MaterNum ).GasFract( gas );
+          output_1588["Glazing"]["Gaps"][i]["Mixture"][gas-1]["Molecular Weight"] = Material( MaterNum ).GasWght( gas );
+          output_1588["Glazing"]["Gaps"][i]["Mixture"][gas-1]["Specific Heat Ratio"] = Material( MaterNum ).GasSpecHeatRatio( gas );
+          for ( int ICoeff = 1; ICoeff <= 3; ++ICoeff ) {
+						output_1588["Glazing"]["Gaps"][i]["Mixture"][gas-1]["Conductivity"][ICoeff-1] = Material( MaterNum ).GasCon( gas, ICoeff );
+						output_1588["Glazing"]["Gaps"][i]["Mixture"][gas-1]["Viscosity"][ICoeff-1] = Material( MaterNum ).GasVis( gas, ICoeff );
+						output_1588["Glazing"]["Gaps"][i]["Mixture"][gas-1]["Specific Heat"][ICoeff-1] = Material( MaterNum ).GasCp( gas, ICoeff );
+					}
         }
       }
 
