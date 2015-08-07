@@ -924,9 +924,9 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
       if ( number_of_panes == 1)
         u_eog = u_cog;
       else {
-        Real64 eog_a = root["Spacers"][spacer_type]["Coefficients"][std::max(number_of_panes,3)-2][0].asDouble();
-        Real64 eog_b = root["Spacers"][spacer_type]["Coefficients"][std::max(number_of_panes,3)-2][1].asDouble();
-        Real64 eog_c = root["Spacers"][spacer_type]["Coefficients"][std::max(number_of_panes,3)-2][2].asDouble();
+        Real64 eog_a = root["Spacers"][spacer_type]["Coefficients"][std::min(number_of_panes,3)-2][0].asDouble();
+        Real64 eog_b = root["Spacers"][spacer_type]["Coefficients"][std::min(number_of_panes,3)-2][1].asDouble();
+        Real64 eog_c = root["Spacers"][spacer_type]["Coefficients"][std::min(number_of_panes,3)-2][2].asDouble();
         u_eog = eog_a + eog_b*u_cog + eog_c*pow_2(u_cog);
       }
 

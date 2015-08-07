@@ -6711,7 +6711,7 @@ DatabaseFile:WindowASHRAE1588RP,
 Construction:WindowASHRAE1588RP,
        \min-fields 1
        \memo Based on ASHRAE 1588-RP, this will define a layer-by-layer window
-       \memo representation based on rated properties (U-factor and SHGC) and
+       \memo representation based on rated properties (U-factor and SHGC) and 
        \memo other known characteristics. This creates the glazing/gas
        \memo construction layers and the frame/divider object
   A1 , \field Name
@@ -6777,18 +6777,23 @@ Construction:WindowASHRAE1588RP,
        \minimum> 0
        \autocalculatable
        \default autocalculate
-  A3 , \field Glazing Tint
+  A3 , \field Glazing Substrate Type
        \note This field is used to determine the thermal and optical
-       \note properties of the glazing layers.
+       \note properties of the glazing layers. Colored substrates are only
+       \note applied to the first pane of the glazing system.
        \type choice
+       \key LowIron
        \key Clear
-       \key Medium
-       \key Dark
+       \key Bronze
+       \key Blue
+       \key Gray
+       \key LightGreen
+       \key Green
+       \key DarkGray
        \autocalculatable
        \default autocalculate
-  A4 , \field Exterior Glazing Coating Type
-       \note Coatings are applied to the back surface of all but the inner
-       \note most pane.
+  A4 , \field Glazing Coating Type
+       \note Coatings are applied to the back surface of the first pane.
        \type choice
        \key None
        \key ReflectiveMetal
@@ -6804,7 +6809,6 @@ Construction:WindowASHRAE1588RP,
        \key Argon
        \key Krypton
        \key Xenon
-       \key Vacuum
        \autocalculatable
        \default autocalculate
   N5,  \field Gap Thickness
@@ -6819,17 +6823,16 @@ Construction:WindowASHRAE1588RP,
        \key Steel
        \key Butyl
        \key Fiberglass
-       \key Wood
        \key Insulated
        \autocalculatable
        \default autocalculate
   A7 , \field Frame Material Type
        \note This is used to set the frame and divider conductance.
        \type choice
-       \key Wood
+       \key WoodOrVinyl
        \key Insulated
-       \key AluminumUnbroken
-       \key AluminumBroken
+       \key Metal
+       \key MetalWithThermalBreak
        \key Structural
        \key Vinyl
        \autocalculatable
