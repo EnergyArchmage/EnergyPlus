@@ -6711,7 +6711,7 @@ DatabaseFile:WindowASHRAE1588RP,
 Construction:WindowASHRAE1588RP,
        \min-fields 1
        \memo Based on ASHRAE 1588-RP, this will define a layer-by-layer window
-       \memo representation based on rated properties (U-factor and SHGC) and 
+       \memo representation based on rated properties (U-factor and SHGC) and
        \memo other known characteristics. This creates the glazing/gas
        \memo construction layers and the frame/divider object
   A1 , \field Name
@@ -6834,7 +6834,6 @@ Construction:WindowASHRAE1588RP,
        \key Metal
        \key MetalWithThermalBreak
        \key Structural
-       \key Vinyl
        \autocalculatable
        \default autocalculate
   N6 , \field Frame Width
