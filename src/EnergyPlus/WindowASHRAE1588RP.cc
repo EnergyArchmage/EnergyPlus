@@ -101,8 +101,8 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
   // Get list of Coatings from the database
   std::vector < std::string > coating_keys = root["Coatings"].getMemberNames();
 
-  // Get list of Tints from the database
-  std::vector < std::string > tint_keys = root["Substrates"].getMemberNames();
+  // Get list of Substrates from the database
+  std::vector < std::string > substrate_keys = root["Substrates"].getMemberNames();
 
   // Get list of Fenestration Types from the database
   std::vector < std::string > type_keys = root["Types"].getMemberNames();
@@ -336,24 +336,24 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
       glass_thickness = 0.003;
     }
 
-    // Glazing Tint
-    std::string glazing_tint;
-    bool glazing_tint_lock;
+    // Glazing Substrate
+    std::string glazing_substrate;
+    bool glazing_substrate_lock;
 
     if ( lAlphaFieldBlanks( 3 ) )
     {
-      glazing_tint_lock = false;
+      glazing_substrate_lock = false;
     }
     else
     {
-      glazing_tint_lock = true;
-      glazing_tint = ConstructAlphas( 3 );
-      search_database_keys_for_input(construction_name, "Glazing Tint Type", tint_keys, glazing_tint, ErrorsFound);
+      glazing_substrate_lock = true;
+      glazing_substrate = ConstructAlphas( 3 );
+      search_database_keys_for_input(construction_name, "Glazing Substrate Type", substrate_keys, glazing_substrate, ErrorsFound);
     }
 
-    if (! glazing_tint_lock )
+    if (! glazing_substrate_lock )
     {
-      glazing_tint = "CLEAR";
+      glazing_substrate = "CLEAR";
     }
 
     // Glazing Coating
@@ -687,9 +687,9 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
         SpectralData( 1 ).WaveLength( i ) = root["Wavelengths"][i-1].asDouble(); // Wavelengths
 
         // Construct spectral data from component properties
-        Real64 tau_s = root["Substrates"][glazing_tint]["tau_s"][i-1].asDouble();
-				tau_s = std::pow(tau_s,glass_thickness/root["Substrates"][glazing_tint]["Thickness"].asDouble());
-        Real64 r_s = root["Substrates"][glazing_tint]["r_s"][i-1].asDouble();
+        Real64 tau_s = root["Substrates"][glazing_substrate]["tau_s"][i-1].asDouble();
+				tau_s = std::pow(tau_s,glass_thickness/root["Substrates"][glazing_substrate]["Thickness"].asDouble());
+        Real64 r_s = root["Substrates"][glazing_substrate]["r_s"][i-1].asDouble();
 				Real64 t_c, rf_c, rb_c;
 
         if (glazing_coating != "NONE") {
@@ -831,15 +831,15 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
       // Define material properties for glazings
       for ( int MaterNum = 1; MaterNum <= number_of_new_materials; MaterNum += 2 )
       {
-        std::string coating, tint;
+        std::string coating, substrate;
         if (MaterNum == 1) {
           coating = glazing_coating;
-          tint = glazing_tint;
+          substrate = glazing_substrate;
           Material( MaterNum ).GlassSpectralDataPtr = 1;
         }
         else {
           coating = "NONE";
-          tint = "CLEAR";
+          substrate = "CLEAR";
           Material( MaterNum ).GlassSpectralDataPtr = 2;
         }
         Material( MaterNum ).Group = WindowGlass;
@@ -1054,11 +1054,11 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
         output_1588["Glazing"]["Panes"][i]["Conductivity"] = Material( MaterNum ).Conductivity;
         if (i == 0) {
           output_1588["Glazing"]["Panes"][i]["Coating"] = glazing_coating;
-          output_1588["Glazing"]["Panes"][i]["Tint"] = glazing_tint;
+          output_1588["Glazing"]["Panes"][i]["Substrate"] = glazing_substrate;
         }
         else {
           output_1588["Glazing"]["Panes"][i]["Coating"] = "NONE";
-          output_1588["Glazing"]["Panes"][i]["Tint"] = "CLEAR";
+          output_1588["Glazing"]["Panes"][i]["Substrate"] = "CLEAR";
         }
         output_1588["Glazing"]["Panes"][i]["Average Infrared Transmittance"] = Material( MaterNum ).TransThermal;
         output_1588["Glazing"]["Panes"][i]["Average Infrared Back Side Absorptance"] = Material( MaterNum ).AbsorpThermalBack;
