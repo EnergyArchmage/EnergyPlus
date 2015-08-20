@@ -96,38 +96,38 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		ShowFatalError( "Program terminates due to these conditions." );
 	}
 
-	Json::Value root = read_1588_database(db_1588_file_path);
+	auto database = ASHRAE1588Database(read_1588_database(db_1588_file_path));
 
 	// Get list of Coatings from the database
-	std::vector < std::string > coating_keys = root["Coatings"].getMemberNames();
+	std::vector < std::string > coating_keys = database.getTraitOptions("Coatings");
 
 	// Get list of Substrates from the database
-	std::vector < std::string > substrate_keys = root["Substrates"].getMemberNames();
+	std::vector < std::string > substrate_keys = database.getTraitOptions("Substrates");
 
 	// Get list of Fenestration Types from the database
-	std::vector < std::string > type_keys = root["Types"].getMemberNames();
+	std::vector < std::string > type_keys = database.getTraitOptions("Types");
 
 	// Get list of Frames from the database
-	std::vector < std::string > frame_keys = root["Frames"].getMemberNames();
+	std::vector < std::string > frame_keys = database.getTraitOptions("Frames");
 
 	// Get list of Spacers from the database
-	std::vector < std::string > spacer_keys = root["Spacers"].getMemberNames();
+	std::vector < std::string > spacer_keys = database.getTraitOptions("Spacers");
 
 	// Get list of Gases from the database
-	std::vector < std::string > gas_keys = root["Gases"].getMemberNames();
+	std::vector < std::string > gas_keys = database.getTraitOptions("Gases");
 
 	// Set testing conditions
-	Real64 u_indoor_temp = root["Tests"]["U-factor"]["Indoor Temperature"].asDouble();
-	Real64 u_outdoor_temp = root["Tests"]["U-factor"]["Outdoor Temperature"].asDouble();
-	Real64 u_wind_speed = root["Tests"]["U-factor"]["Wind Speed"].asDouble();
-	Real64 u_solar = root["Tests"]["U-factor"]["Solar Incidence"].asDouble();
+	Real64 u_indoor_temp = database.tests["U-factor"]["Indoor Temperature"].asDouble();
+	Real64 u_outdoor_temp = database.tests["U-factor"]["Outdoor Temperature"].asDouble();
+	Real64 u_wind_speed = database.tests["U-factor"]["Wind Speed"].asDouble();
+	Real64 u_solar = database.tests["U-factor"]["Solar Incidence"].asDouble();
 
-	Real64 s_indoor_temp = root["Tests"]["SHGC"]["Indoor Temperature"].asDouble();
-	Real64 s_outdoor_temp = root["Tests"]["SHGC"]["Outdoor Temperature"].asDouble();
-	Real64 s_wind_speed = root["Tests"]["SHGC"]["Wind Speed"].asDouble();
-	Real64 s_solar = root["Tests"]["SHGC"]["Solar Incidence"].asDouble();
+	Real64 s_indoor_temp = database.tests["SHGC"]["Indoor Temperature"].asDouble();
+	Real64 s_outdoor_temp = database.tests["SHGC"]["Outdoor Temperature"].asDouble();
+	Real64 s_wind_speed = database.tests["SHGC"]["Wind Speed"].asDouble();
+	Real64 s_solar = database.tests["SHGC"]["Solar Incidence"].asDouble();
 
-	int spectral_data_size = root["Wavelengths"].size();
+	int spectral_data_size = database.wavelengths.size();
 
 	int ConstructNumAlpha; // Number of construction alpha names being passed
 	int ConstructNumNumeric; // dummy variable for properties being passed
@@ -263,7 +263,7 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		std::string fenestration_type;
 		if ( lAlphaFieldBlanks( 2 ) )
 		{
-			fenestration_type = "FIXED";
+			fenestration_type = database.getTraitNameWithMaxUtility("Types");
 		}
 		else
 		{
@@ -286,36 +286,7 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		}
 		if ( ! number_of_panes_lock )
 		{
-			if (u_factor_set)
-			{
-				// For now use Arasteh method
-				if (target_u_factor < (1.4 + 1.7)/2.0) // use average for now since we can't interpolate
-				{
-					if (shgc_set)
-					{
-						if ( target_shgc < (0.35 + 0.45)/2 )
-						{
-							number_of_panes = 3;
-						}
-						else
-						{
-							number_of_panes = 2; // vacuum glazings
-						}
-					}
-				}
-				else if (target_u_factor < (3.4 + 4.5)/2.0)
-				{
-					number_of_panes = 2;
-				}
-				else
-				{
-					number_of_panes = 1;
-				}
-			}
-			else
-			{
-				number_of_panes = 2;
-			}
+			number_of_panes = database.getDiscreteTraitValueWithMaxUtility("Panes").asInt();
 		}
 
 		// Glazing Thickness
@@ -333,7 +304,7 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 
 		if ( ! glass_thickness_lock )
 		{
-			glass_thickness = 0.003;
+			glass_thickness = database.getContinuousTraitValueWithMaxUtility("Glazing Thickness");
 		}
 
 		// Glazing Substrate
@@ -353,7 +324,7 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 
 		if (! glazing_substrate_lock )
 		{
-			glazing_substrate = "CLEAR";
+			glazing_substrate = database.getTraitNameWithMaxUtility("Substrates");
 		}
 
 		// Glazing Coating
@@ -373,7 +344,7 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 
 		if (! glazing_coating_lock )
 		{
-			glazing_coating = "NONE";
+			glazing_coating = database.getTraitNameWithMaxUtility("Coatings");
 		}
 
 		// Gas Type
@@ -393,7 +364,7 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 
 		if (! gas_type_lock )
 		{
-			gas_type = "AIR";
+			gas_type = database.getTraitNameWithMaxUtility("Gases");
 		}
 
 		// Gap Thickness
@@ -411,7 +382,7 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 
 		if ( ! gap_thickness_lock )
 		{
-			gap_thickness = 0.0127;
+			gap_thickness = database.getContinuousTraitValueWithMaxUtility("Gap Thickness");
 		}
 
 		// Spacer Material Type
@@ -431,7 +402,7 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 
 		if (! spacer_type_lock )
 		{
-			spacer_type = "STEEL";
+			spacer_type = database.getTraitNameWithMaxUtility("Spacers");
 		}
 
 		// Frame Material
@@ -451,7 +422,7 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 
 		if (! frame_material_lock )
 		{
-			frame_material = "VINYL";
+			frame_material = database.getTraitNameWithMaxUtility("Frames");
 		}
 
 		// Frame Width
@@ -470,7 +441,7 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 
 		if (! frame_width_lock )
 		{
-			frame_width = 0.05;
+			frame_width = database.getContinuousTraitValueWithMaxUtility("Frame Width");
 		}
 
 		// Divider Width
@@ -588,19 +559,36 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		bool target_matched = false;
 
 		// This is where the iterative optimization loop will begin
+		Json::Value fenestrationTypeValue;
+		Json::Value spacerTypeValue;
+		Json::Value frameMaterialValue;
+
+		Json::Value substrateValue;
+		Json::Value coatingValue;
+
+		Json::Value gasValue;
+
 		while (! target_matched)
 		{
+			fenestrationTypeValue = database.getTraitValueByName("Types",fenestration_type);
+			spacerTypeValue = database.getTraitValueByName("Spacers",spacer_type);
+			frameMaterialValue = database.getTraitValueByName("Frames",frame_material);
 
-			frame_solar_absorptivity = root["Types"][fenestration_type]["Frame Absorptivity"].asDouble();
-			frame_visible_absorptivity = root["Types"][fenestration_type]["Frame Absorptivity"].asDouble();
+			substrateValue = database.getTraitValueByName("Substrates",glazing_substrate);
+			coatingValue = database.getTraitValueByName("Coatings",glazing_coating);
+
+			gasValue = database.getTraitValueByName("Gases",gas_type);
+
+			frame_solar_absorptivity = fenestrationTypeValue["Frame Absorptivity"].asDouble();
+			frame_visible_absorptivity = fenestrationTypeValue["Frame Absorptivity"].asDouble();
 
 			Real64 frame_u_factor;
-			std::string fenestration_category = root["Types"][fenestration_type]["Category"].asString();
-			if ( root["Spacers"][spacer_type]["Metal"].asBool() ) {
-				frame_u_factor = root["Frames"][frame_material]["Metal Spacer"][fenestration_category][std::min(number_of_panes,3)-1].asDouble();
+			std::string fenestration_category = fenestrationTypeValue["Category"].asString();
+			if ( spacerTypeValue["Metal"].asBool() ) {
+				frame_u_factor = frameMaterialValue["Metal Spacer"][fenestration_category][std::min(number_of_panes,3)-1].asDouble();
 			}
 			else {
-				frame_u_factor = root["Frames"][frame_material]["Non-Metal Spacer"][fenestration_category][std::min(number_of_panes,3)-1].asDouble();
+				frame_u_factor = frameMaterialValue["Non-Metal Spacer"][fenestration_category][std::min(number_of_panes,3)-1].asDouble();
 			}
 
 			Real64 assumed_h_o = 30;	// W/m2-K
@@ -612,9 +600,9 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 				frame_conductance = 1/(1/frame_u_factor - (1/assumed_h_o + 1/assumed_h_i));
 			}
 
-			fenestration_width = root["Types"][fenestration_type]["Width"].asDouble();
-			fenestration_height = root["Types"][fenestration_type]["Height"].asDouble();
-			tilt = root["Types"][fenestration_type]["Tilt"].asDouble()*Pi/180.0;
+			fenestration_width = fenestrationTypeValue["Width"].asDouble();
+			fenestration_height = fenestrationTypeValue["Height"].asDouble();
+			tilt = fenestrationTypeValue["Tilt"].asDouble()*Pi/180.0;
 
 			if ( frame_width > 0.0 )
 			{
@@ -684,18 +672,18 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 			SpectralData( 1 ).ReflBack.allocate( spectral_data_size ); // Back reflectance at normal incidence
 
 			for ( int i = 1; i <= spectral_data_size; i++ ) {
-				SpectralData( 1 ).WaveLength( i ) = root["Wavelengths"][i-1].asDouble(); // Wavelengths
+				SpectralData( 1 ).WaveLength( i ) = database.wavelengths[i-1]; // Wavelengths
 
 				// Construct spectral data from component properties
-				Real64 tau_s = root["Substrates"][glazing_substrate]["tau_s"][i-1].asDouble();
-				tau_s = std::pow(tau_s,glass_thickness/root["Substrates"][glazing_substrate]["Thickness"].asDouble());
-				Real64 r_s = root["Substrates"][glazing_substrate]["r_s"][i-1].asDouble();
+				Real64 tau_s = substrateValue["tau_s"][i-1].asDouble();
+				tau_s = std::pow(tau_s,glass_thickness/substrateValue["Thickness"].asDouble());
+				Real64 r_s = substrateValue["r_s"][i-1].asDouble();
 				Real64 t_c, rf_c, rb_c;
 
 				if (glazing_coating != "NONE") {
-					t_c = root["Coatings"][glazing_coating]["t_c"][i-1].asDouble();
-					rf_c = root["Coatings"][glazing_coating]["rf_c"][i-1].asDouble();
-					rb_c = root["Coatings"][glazing_coating]["rb_c"][i-1].asDouble();
+					t_c = coatingValue["t_c"][i-1].asDouble();
+					rf_c = coatingValue["rf_c"][i-1].asDouble();
+					rb_c = coatingValue["rb_c"][i-1].asDouble();
 				}
 				else {
 					t_c = 1 - r_s;
@@ -771,10 +759,12 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 						innerSubstrate = "LOWIRON";
 					}
 
+					Json::Value innerSubstrateValue = database.getTraitValueByName("Substrates",innerSubstrate);
+
 					// Construct spectral data from component properties
-					Real64 tau_s = root["Substrates"][innerSubstrate]["tau_s"][i-1].asDouble();
-					tau_s = std::pow(tau_s,glass_thickness/root["Substrates"][innerSubstrate]["Thickness"].asDouble());
-					Real64 r_s = root["Substrates"][innerSubstrate]["r_s"][i-1].asDouble();
+					Real64 tau_s = innerSubstrateValue["tau_s"][i-1].asDouble();
+					tau_s = std::pow(tau_s,glass_thickness/innerSubstrateValue["Thickness"].asDouble());
+					Real64 r_s = innerSubstrateValue["r_s"][i-1].asDouble();
 					Real64 t_c = 1 - r_s;
 					Real64 rf_c = r_s;
 					Real64 rb_c = r_s;
@@ -854,8 +844,8 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 				Material( MaterNum ).ROnly = true;
 				Material( MaterNum ).Thickness = glass_thickness;
 				Material( MaterNum ).TransThermal = 0.0;
-				Material( MaterNum ).AbsorpThermalFront = root["Coatings"][coating]["Emissivity (Front)"].asDouble();
-				Material( MaterNum ).AbsorpThermalBack = root["Coatings"][coating]["Emissivity (Back)"].asDouble();
+				Material( MaterNum ).AbsorpThermalFront = coatingValue["Emissivity (Front)"].asDouble();
+				Material( MaterNum ).AbsorpThermalBack = coatingValue["Emissivity (Back)"].asDouble();
 				Material( MaterNum ).Conductivity = 1.0;
 				Material( MaterNum ).GlassTransDirtFactor = 1.0;	// Hold at unity to find match and then apply to outside layer
 				Material( MaterNum ).YoungModulus = 7.2e10;
@@ -868,7 +858,7 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 
 			}
 
-			int num_gases = root["Gases"][gas_type].size();
+			int num_gases = gasValue.size();
 
 			// Define material properties for gaps
 			for ( int MaterNum = 2; MaterNum <= number_of_new_materials; MaterNum += 2 )
@@ -883,13 +873,13 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 				for ( int gas = 1; gas <= num_gases; gas++)
 				{
 					Material( MaterNum ).GasType( gas ) = 0;
-					Material( MaterNum ).GasFract( gas ) = root["Gases"][gas_type][gas-1]["Fraction"].asDouble();
-					Material( MaterNum ).GasWght( gas ) = root["Gases"][gas_type][gas-1]["Molecular Weight"].asDouble();
-					Material( MaterNum ).GasSpecHeatRatio( gas ) = root["Gases"][gas_type][gas-1]["Specific Heat Ratio"].asDouble();
+					Material( MaterNum ).GasFract( gas ) = gasValue[gas-1]["Fraction"].asDouble();
+					Material( MaterNum ).GasWght( gas ) = gasValue[gas-1]["Molecular Weight"].asDouble();
+					Material( MaterNum ).GasSpecHeatRatio( gas ) = gasValue[gas-1]["Specific Heat Ratio"].asDouble();
 					for ( int ICoeff = 1; ICoeff <= 3; ++ICoeff ) {
-						Material( MaterNum ).GasCon( ICoeff, gas ) = root["Gases"][gas_type][gas-1]["Conductivity"][ICoeff-1].asDouble();
-						Material( MaterNum ).GasVis( ICoeff, gas ) = root["Gases"][gas_type][gas-1]["Viscosity"][ICoeff-1].asDouble();
-						Material( MaterNum ).GasCp( ICoeff, gas ) = root["Gases"][gas_type][gas-1]["Specific Heat"][ICoeff-1].asDouble();
+						Material( MaterNum ).GasCon( ICoeff, gas ) = gasValue[gas-1]["Conductivity"][ICoeff-1].asDouble();
+						Material( MaterNum ).GasVis( ICoeff, gas ) = gasValue[gas-1]["Viscosity"][ICoeff-1].asDouble();
+						Material( MaterNum ).GasCp( ICoeff, gas ) = gasValue[gas-1]["Specific Heat"][ICoeff-1].asDouble();
 					}
 				}
 
@@ -930,9 +920,9 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 			if ( number_of_panes == 1)
 				u_eog = u_cog;
 			else {
-				Real64 eog_a = root["Spacers"][spacer_type]["Coefficients"][std::min(number_of_panes,3)-2][0].asDouble();
-				Real64 eog_b = root["Spacers"][spacer_type]["Coefficients"][std::min(number_of_panes,3)-2][1].asDouble();
-				Real64 eog_c = root["Spacers"][spacer_type]["Coefficients"][std::min(number_of_panes,3)-2][2].asDouble();
+				Real64 eog_a = spacerTypeValue["Coefficients"][std::min(number_of_panes,3)-2][0].asDouble();
+				Real64 eog_b = spacerTypeValue["Coefficients"][std::min(number_of_panes,3)-2][1].asDouble();
+				Real64 eog_c = spacerTypeValue["Coefficients"][std::min(number_of_panes,3)-2][2].asDouble();
 				u_eog = eog_a + eog_b*u_cog + eog_c*pow_2(u_cog);
 			}
 
@@ -1101,11 +1091,11 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 						Real64 WlNext = SpectralData(spectral_data_index).WaveLength( lam + 1 );
 
 						// Solar Spectrum and Photopic Response
-						Real64 SS = root["Solar Spectrum"][lam - 1].asDouble();
-						Real64 SSNext = root["Solar Spectrum"][lam].asDouble();
+						Real64 SS = database.solarSpectrum[lam - 1];
+						Real64 SSNext = database.solarSpectrum[lam];
 
-						Real64 PR = root["Photopic Response"][lam - 1].asDouble();
-						Real64 PRNext = root["Photopic Response"][lam].asDouble();
+						Real64 PR = database.photopicResponse[lam - 1];
+						Real64 PRNext = database.photopicResponse[lam];
 
 						Real64 eSol = (WlNext - Wl)*0.5*(SS + SSNext);
 						Real64 eVis = (WlNext - Wl)*0.5*(SS + SSNext)*0.5*(PR + PRNext);
@@ -1133,14 +1123,12 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 				output_1588["Glazing"]["Panes"][i]["Average Visible Back Side Reflectance"] = RefBackVisUp/VisDown;
 			}
 
-			int num_gases = root["Gases"][gas_type].size();
-
 			for ( int MaterNum = 2; MaterNum <= number_of_new_materials; MaterNum += 2 ) {
 				int i = (MaterNum-2)/2;
 				output_1588["Glazing"]["Gaps"][i]["Primary Gas"] = gas_type;
 				output_1588["Glazing"]["Gaps"][i]["Thickness"] = Material( MaterNum ).Thickness;
-				for (int gas = 1; gas <= num_gases; gas++) {
-					output_1588["Glazing"]["Gaps"][i]["Mixture"][gas-1]["Gas"] = root["Gases"][gas_type][gas-1]["Gas"];
+				for (int gas = 1; gas <= Material( MaterNum ).NumberOfGasesInMixture; gas++) {
+					output_1588["Glazing"]["Gaps"][i]["Mixture"][gas-1]["Gas"] = gasValue[gas-1]["Gas"];
 					output_1588["Glazing"]["Gaps"][i]["Mixture"][gas-1]["Fraction"] = Material( MaterNum ).GasFract( gas );
 					output_1588["Glazing"]["Gaps"][i]["Mixture"][gas-1]["Molecular Weight"] = Material( MaterNum ).GasWght( gas );
 					output_1588["Glazing"]["Gaps"][i]["Mixture"][gas-1]["Specific Heat Ratio"] = Material( MaterNum ).GasSpecHeatRatio( gas );
@@ -1617,6 +1605,86 @@ void remove_dummy_variables()
 	BeamSolarRad = 0.0;
 	SunIsUp = false;
 
+}
+
+ASHRAE1588Database::ASHRAE1588Database(Json::Value db) : db(db) {
+	tests = db["Tests"];
+
+	Json::Value &sd = db["Spectral Functions"];
+	assert((sd["Wavelengths"].size() == sd["Solar Spectrum"].size()) && (sd["Wavelengths"].size() == sd["Photopic Response"].size()));
+	for ( int i = 0; i < int(sd["Wavelengths"].size()); ++i ) {
+		wavelengths.push_back(sd["Wavelengths"][i].asDouble());
+		solarSpectrum.push_back(sd["Solar Spectrum"][i].asDouble());
+		photopicResponse.push_back(sd["Photopic Response"][i].asDouble());
+	}
+}
+
+std::vector <std::string> ASHRAE1588Database::getTraitOptions(std::string trait) {
+	// Only works for discrete traits should add error message if it's not
+	std::vector <std::string> traitOptions;
+	Json::Value &traitNode = db["Traits"][trait];
+	for (Json::ValueIterator itr = traitNode.begin(); itr != traitNode.end(); ++itr) {
+		traitOptions.push_back((*itr)["Name"].asString());
+	}
+	return traitOptions;
+}
+
+int ASHRAE1588Database::getTraitIndexByName(std::string trait, std::string name) {
+	Json::Value &traitNode = db["Traits"][trait];
+	for (struct {Json::ValueIterator itr; int i ;} d = {traitNode.begin(), 0}; d.itr != traitNode.end(); ++d.itr, ++d.i) {
+		if ((*d.itr)["Name"].asString() == name) {
+			return d.i;
+		}
+	}
+	return -1;
+}
+
+std::string ASHRAE1588Database::getTraitNameByIndex(std::string trait, int index) {
+	Json::Value &traitNode = db["Traits"][trait];
+	return traitNode[index]["Name"].asString();
+}
+
+int ASHRAE1588Database::getTraitIndexWithMaxUtility(std::string trait) {
+	Json::Value &traitNode = db["Traits"][trait];
+	Json::ValueIterator maxItr = std::max_element(traitNode.begin(),traitNode.end(),[](Json::Value a, Json::Value b){return (a["Utility"] < b["Utility"]);});
+	return std::distance(traitNode.begin(), maxItr);
+}
+
+std::string ASHRAE1588Database::getTraitNameWithMaxUtility(std::string trait) {
+	return getTraitNameByIndex(trait, getTraitIndexWithMaxUtility(trait));
+}
+
+Json::Value ASHRAE1588Database::getDiscreteTraitValueWithMaxUtility(std::string trait) {
+	return getTraitValueByIndex(trait, getTraitIndexWithMaxUtility(trait));
+}
+
+Real64 ASHRAE1588Database::getContinuousTraitValueWithMaxUtility(std::string trait) {
+	Json::Value &traitNode = db["Traits"][trait];
+	if (traitNode["Distribution"].asString() == "Normal") {
+		return traitNode["Shift"].asDouble();
+	}
+	else if (traitNode["Distribution"].asString() == "Log-Normal") {
+		Real64 shift = traitNode["Shift"].asDouble();
+		Real64 shape = traitNode["Shape"].asDouble();
+		return exp(shift-pow2(shape));
+	}
+	else {
+		return -1;
+	}
+}
+
+Json::Value ASHRAE1588Database::getTraitValueByName(std::string trait, std::string name) {
+	Json::Value &traitNode = db["Traits"][trait];
+	int index = getTraitIndexByName(trait, name);
+	if (index < 0) {
+		std::cerr << "ERROR: " + name + " not found in list of " + trait + "." << std::endl;
+	}
+	assert(index >= 0);
+	return traitNode[index]["Value"];
+}
+
+Json::Value ASHRAE1588Database::getTraitValueByIndex(std::string trait, int index) {
+	return db["Traits"][trait][index]["Value"];
 }
 
 } // WindowASHRAE1588RP
