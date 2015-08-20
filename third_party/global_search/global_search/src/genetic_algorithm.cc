@@ -72,15 +72,17 @@ globalSearch::GeneticAlgorithm::GeneticAlgorithm() :
 		0.15}
 {}
 
-double
+globalSearch::Individual
 globalSearch::GeneticAlgorithm::run()
 {
 	startReport();
 	std::vector<globalSearch::Individual> population = generateInitialPopulation();
 	std::vector<globalSearch::Individual> nextPopulation;
 	globalSearch::Individual fittest;
+	globalSearch::Individual globalFittest;
 	evaluatePopulation(population);
 	fittest = fittestMemberOf(population);
+	globalFittest = fittest;
 	for (int generation=0; generation < maximumGenerations_; generation++) {
 		reportProgress(generation, population, fittest);
 		nextPopulation = selectSurvivors(population);
@@ -94,10 +96,13 @@ globalSearch::GeneticAlgorithm::run()
 		evaluatePopulation(population);
 		assert(populationSize_ == population.size());
 		fittest = fittestMemberOf(population);
+		if (fittest.fitness > globalFittest.fitness) {
+			globalFittest = fittest;
+		}
 		assert(populationSize_ == population.size());
 		//elitist ( );
 	}
-	return 0.0;
+	return globalFittest;
 }
 
 double

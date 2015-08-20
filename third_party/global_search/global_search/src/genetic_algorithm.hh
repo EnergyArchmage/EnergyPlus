@@ -35,7 +35,7 @@ class GeneticAlgorithm
 		GeneticAlgorithm();
 
 	public: // Methods
-		double run();
+		Individual run();
 		double randomRange(double lower, double upper);
 		double nthRandomGene(int n);
 
