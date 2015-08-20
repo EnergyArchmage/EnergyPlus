@@ -82,11 +82,19 @@ globalSearch::GeneticAlgorithm::run()
 	evaluatePopulation(population);
 	fittest = fittestMemberOf(population);
 	for (int generation=0; generation < maximumGenerations_; generation++) {
-		nextPopulation = selectSurvivors(population);
-		nextPopulation = crossover(nextPopulation);
-		mutatePopulation(nextPopulation);
 		reportProgress(generation, population, fittest);
-		//evaluate ( );
+		nextPopulation = selectSurvivors(population);
+		assert(populationSize_ == nextPopulation.size());
+		nextPopulation = crossover(nextPopulation);
+		assert(populationSize_ == nextPopulation.size());
+		mutatePopulation(nextPopulation);
+		assert(populationSize_ == nextPopulation.size());
+		population = copyPopulation(nextPopulation);
+		assert(populationSize_ == population.size());
+		evaluatePopulation(population);
+		assert(populationSize_ == population.size());
+		fittest = fittestMemberOf(population);
+		assert(populationSize_ == population.size());
 		//elitist ( );
 	}
 	return 0.0;
@@ -151,8 +159,8 @@ globalSearch::GeneticAlgorithm::initIndividual()
 void
 globalSearch::GeneticAlgorithm::evaluatePopulation(std::vector<globalSearch::Individual>& pop)
 {
-	for (auto pIt = pop.begin(); pIt != pop.end(); ++pIt) {
-		(*pIt).fitness = (*objFn_)((*pIt).genes);
+	for (auto &member : pop) {
+		member.fitness = (*objFn_)(member.genes);
 	}
 	return;
 }
@@ -163,7 +171,7 @@ globalSearch::GeneticAlgorithm::fittestMemberOf(const std::vector<globalSearch::
 	double bestFitnessThusFar;
 	globalSearch::Individual fittest;
 	bool first = true;
-	for (const auto member : pop) {
+	for (const auto &member : pop) {
 		if (first) {
 			fittest = member;
 			bestFitnessThusFar = fittest.fitness;
@@ -183,30 +191,38 @@ globalSearch::GeneticAlgorithm::selectSurvivors(std::vector<globalSearch::Indivi
 {
 	std::vector<globalSearch::Individual> newPop;
 	int i, j;
-	double p;
+	double p, cf0, cfj, cfjj;
+	int lastIdx = populationSize_ - 1;
 	double cumulativeFitness = 0.0;
-	double totalFitnessOfPopulation = std::accumulate(
-			pop.begin(),
-			pop.end(),
-			0.0,
-			[](double sum, globalSearch::Individual ind) { return sum + ind.fitness; });
-	for (auto memIt = pop.begin(); memIt != pop.end(); ++memIt) {
-		(*memIt).relativeFitness = (*memIt).fitness / totalFitnessOfPopulation;
+	double totalFitnessOfPopulation = 0.0;
+	for (const auto &member : pop) {
+		totalFitnessOfPopulation += member.fitness;
 	}
-	for (auto memIt = pop.begin(); memIt != pop.end(); ++memIt) {
-		cumulativeFitness += (*memIt).relativeFitness;
-		(*memIt).cumulativeFitness = cumulativeFitness;
+	for (auto &member : pop) {
+		member.relativeFitness = member.fitness / totalFitnessOfPopulation;
+	}
+	for (auto &member : pop) {
+		cumulativeFitness += member.relativeFitness;
+		member.cumulativeFitness = cumulativeFitness;
 	}
 	// Roulette Wheel Selection for the New Population
+	cf0 = pop.at(0).cumulativeFitness;
 	for (i = 0; i < populationSize_; ++i) {
 		p = randomRange(0.0, 1.0);
-		if (p < pop.at(0).cumulativeFitness) {
+		if (p < cf0) {
 			newPop.push_back(pop.at(0));
 		} else {
-			for (j = 0; j < (populationSize_ - 1); ++j) {
-				if ((p >= pop.at(j).cumulativeFitness) &&
-						(p < pop.at(j+1).cumulativeFitness)) {
-					newPop.push_back(pop.at(j+1));
+			for (j = 0; j < populationSize_; ++j) {
+				if (j == lastIdx) {
+					newPop.push_back(pop.at(j));
+					break;
+				} else {
+					cfj = pop.at(j).cumulativeFitness;
+					cfjj = pop.at(j+1).cumulativeFitness;
+					if ((p >= cfj) && (p < cfjj)) {
+						newPop.push_back(pop.at(j+1));
+						break;
+					}
 				}
 			}
 		}
@@ -222,10 +238,13 @@ globalSearch::GeneticAlgorithm::crossover(const std::vector<globalSearch::Indivi
 	std::array<globalSearch::Individual,2> children;
 	bool has_mother = false;
 	double p;
+	int idx = 0;
+	int lastIdx = populationSize_ - 1;
 	std::vector<globalSearch::Individual> nextPop;
-	for (const auto member : pop) {
+	for (const auto &member : pop) {
 		p = randomRange(0.0, 1.0);
-		if (p < probabilityOfCrossover_) {
+		if (((p < probabilityOfCrossover_) && (idx != lastIdx)) ||
+				(has_mother && idx == lastIdx)) {
 			if (has_mother) {
 				father = member;
 				children = makeChildren(mother, father);
@@ -239,6 +258,7 @@ globalSearch::GeneticAlgorithm::crossover(const std::vector<globalSearch::Indivi
 		} else {
 			nextPop.push_back(member);
 		}
+		++idx;
 	}
 	return nextPop;
 }
@@ -279,7 +299,7 @@ globalSearch::GeneticAlgorithm::mutatePopulation(std::vector<globalSearch::Indiv
 {
 	double p, newValue;
 	bool varFlag;
-	for (auto member : pop) {
+	for (auto &member : pop) {
 		for (int geneIdx = 0; geneIdx < numberOfGenes_; ++geneIdx) {
 			p = randomRange(0.0, 1.0);
 			if (p < probabilityOfMutation_) {
@@ -324,8 +344,12 @@ globalSearch::GeneticAlgorithm::startReport()
 	std::cout << "  ";
 	std::cout << std::setw(14) << "Pop Fitness";
 	std::cout << "  ";
-	std::cout << std::setw(14) << "Avg Fitness\n";
+	std::cout << std::setw(14) << "Avg Fitness";
+	std::cout << "  ";
+	std::cout << std::setw(14) << "Fittest Genes\n";
 	// line 2
+	std::cout << std::setfill('-') << std::setw(14) << "";
+	std::cout << "  ";
 	std::cout << std::setfill('-') << std::setw(14) << "";
 	std::cout << "  ";
 	std::cout << std::setfill('-') << std::setw(14) << "";
@@ -350,8 +374,28 @@ globalSearch::GeneticAlgorithm::reportProgress(
 			[](double sum, globalSearch::Individual ind) { return sum + ind.fitness; });
 	double avgFitness = totalFitness / ((double)populationSize_);
 	double bestFitness = fittest.fitness;
+	double g;
 	std::cout << std::setw(14) << std::setprecision(6) << generationNumber << "  ";
 	std::cout << std::setw(14) << std::setprecision(6) << bestFitness << "  ";
 	std::cout << std::setw(14) << std::setprecision(6) << totalFitness << "  ";
-	std::cout << std::setw(14) << std::setprecision(6) << avgFitness << "\n";
+	std::cout << std::setw(14) << std::setprecision(6) << avgFitness << "  ";
+	std::cout << std::setprecision(4) << "[";
+	for (int i=0; i < fittest.genes.size(); ++i) {
+		g = fittest.genes.at(i);
+		if (i == fittest.genes.size() - 1) {
+			std::cout << std::setw(4) << g << "]\n";
+		} else {
+			std::cout << std::setw(4) << g << ", ";
+		}
+	}
+}
+
+std::vector<globalSearch::Individual>
+globalSearch::GeneticAlgorithm::copyPopulation(const std::vector<globalSearch::Individual>& pop)
+{
+	std::vector<globalSearch::Individual> out;
+	for (const auto &member : pop) {
+		out.push_back(member);
+	}
+	return out;
 }

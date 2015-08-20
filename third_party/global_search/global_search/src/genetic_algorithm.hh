@@ -50,6 +50,7 @@ class GeneticAlgorithm
 		void mutatePopulation(std::vector<Individual>& population);
 		void startReport();
 		void reportProgress(int generationNumber, const std::vector<Individual>& population, const Individual& fittest);
+		std::vector<Individual> copyPopulation(const std::vector<Individual>& pop);
 
 	private: // Data
 		double (*objFn_)(std::vector<double>);
