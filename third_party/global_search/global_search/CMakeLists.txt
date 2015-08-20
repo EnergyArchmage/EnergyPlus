@@ -13,3 +13,4 @@ target_include_directories(global_search PUBLIC "src")
 
 set_property(TARGET global_search PROPERTY CXX_STANDARD 11)
 set_property(TARGET global_search PROPERTY CXX_STANDARD_REQUIRED ON)
+
