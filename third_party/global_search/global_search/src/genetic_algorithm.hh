@@ -51,6 +51,7 @@ class GeneticAlgorithm
 		void startReport();
 		void reportProgress(int generationNumber, const std::vector<Individual>& population, const Individual& fittest);
 		std::vector<Individual> copyPopulation(const std::vector<Individual>& pop);
+		void insertElite(std::vector<Individual>& population, const Individual& fittest);
 
 	private: // Data
 		double (*objFn_)(std::vector<double>);

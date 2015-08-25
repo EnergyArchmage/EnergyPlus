@@ -95,12 +95,12 @@ globalSearch::GeneticAlgorithm::run()
 		assert(populationSize_ == population.size());
 		evaluatePopulation(population);
 		assert(populationSize_ == population.size());
+		insertElite(population, fittest);
 		fittest = fittestMemberOf(population);
 		if (fittest.fitness > globalFittest.fitness) {
 			globalFittest = fittest;
 		}
 		assert(populationSize_ == population.size());
-		//elitist ( );
 	}
 	return globalFittest;
 }
@@ -338,7 +338,7 @@ globalSearch::GeneticAlgorithm::startReport()
 		if (i == numberOfGenes_ - 1) {
 			std::cout << "]}\n";
 		} else {
-			std::cout << "\n"; 
+			std::cout << "\n";
 		}
 	}
 	std::cout << "\n";
@@ -403,4 +403,33 @@ globalSearch::GeneticAlgorithm::copyPopulation(const std::vector<globalSearch::I
 		out.push_back(member);
 	}
 	return out;
+}
+
+void
+globalSearch::GeneticAlgorithm::insertElite(
+		std::vector<globalSearch::Individual>& population,
+		const globalSearch::Individual& fittest)
+{
+	int bestMemberIdx = 0;
+	int worstMemberIdx = 0;
+  double bestFitness = population.at(bestMemberIdx).fitness;
+	double worstFitness = population.at(worstMemberIdx).fitness;
+	globalSearch::Individual member, newFittest;
+	double fitNext, fit;
+  int i;
+  for (i = 0; i < population.size(); ++i) {
+		member = population.at(i);
+    if (member.fitness > bestFitness ) {
+			bestFitness = member.fitness;
+			bestMemberIdx = i;
+		}
+		if (member.fitness < worstFitness) {
+			worstFitness = member.fitness;
+			worstMemberIdx = i;
+		}
+  }
+  if (bestFitness < fittest.fitness) {
+    population.at(worstMemberIdx) = fittest;
+  }
+  return;
 }
