@@ -17,9 +17,9 @@
 double
 globalSearch::exampleObjectiveFunction(std::vector<double> xs)
 {
-	double x0 = xs.at(0);
-	double x1 = xs.at(1);
-	double x2 = xs.at(2);
+	double x0 = xs[0];
+	double x1 = xs[1];
+	double x2 = xs[2];
 	return (x0 * x0) - (x0 * x1) + x2;
 }
 
@@ -118,12 +118,12 @@ globalSearch::GeneticAlgorithm::randomRange(
 double
 globalSearch::GeneticAlgorithm::nthRandomGene(int n) {
 	double offset = 0.49999;
-	bool continuous = continuousFlags_.at(n);
- 	bool variable = variableFlags_.at(n);
+	bool continuous = continuousFlags_[n];
+ 	bool variable = variableFlags_[n];
 	double newValue, lowerBound, upperBound;
 	if (variable) {
-		lowerBound = lowerBounds_.at(n);
-		upperBound = upperBounds_.at(n);
+		lowerBound = lowerBounds_[n];
+		upperBound = upperBounds_[n];
 		if (continuous) {
 			newValue = randomRange(lowerBound, upperBound);
 		} else {
@@ -131,7 +131,7 @@ globalSearch::GeneticAlgorithm::nthRandomGene(int n) {
 					randomRange(lowerBound - offset, upperBound + offset));
 		}
 	} else {
-		newValue = defaultGenes_.at(n);
+		newValue = defaultGenes_[n];
 	}
 	return newValue;
 }
@@ -211,21 +211,21 @@ globalSearch::GeneticAlgorithm::selectSurvivors(std::vector<globalSearch::Indivi
 		member.cumulativeFitness = cumulativeFitness;
 	}
 	// Roulette Wheel Selection for the New Population
-	cf0 = pop.at(0).cumulativeFitness;
+	cf0 = pop[0].cumulativeFitness;
 	for (i = 0; i < populationSize_; ++i) {
 		p = randomRange(0.0, 1.0);
 		if (p < cf0) {
-			newPop.push_back(pop.at(0));
+			newPop.push_back(pop[0]);
 		} else {
 			for (j = 0; j < populationSize_; ++j) {
 				if (j == lastIdx) {
-					newPop.push_back(pop.at(j));
+					newPop.push_back(pop[j]);
 					break;
 				} else {
-					cfj = pop.at(j).cumulativeFitness;
-					cfjj = pop.at(j+1).cumulativeFitness;
+					cfj = pop[j].cumulativeFitness;
+					cfjj = pop[j+1].cumulativeFitness;
 					if ((p >= cfj) && (p < cfjj)) {
-						newPop.push_back(pop.at(j+1));
+						newPop.push_back(pop[j+1]);
 						break;
 					}
 				}
@@ -253,8 +253,8 @@ globalSearch::GeneticAlgorithm::crossover(const std::vector<globalSearch::Indivi
 			if (has_mother) {
 				father = member;
 				children = makeChildren(mother, father);
-				nextPop.push_back(children.at(0));
-				nextPop.push_back(children.at(1));
+				nextPop.push_back(children[0]);
+				nextPop.push_back(children[1]);
 				has_mother = false;
 			} else {
 				mother = member;
@@ -283,8 +283,8 @@ globalSearch::GeneticAlgorithm::makeChildren(
 	auto first = globalSearch::Individual();
 	auto second = globalSearch::Individual();
 	for (int gIdx = 0; gIdx < numberOfGenes_; gIdx++) {
-		v1 = mom.genes.at(gIdx);
-		v2 = dad.genes.at(gIdx);
+		v1 = mom.genes[gIdx];
+		v2 = dad.genes[gIdx];
 		p = randomRange(0.0, 1.0);
 		if (p < 0.5) {
 			first.genes.push_back(v1);
@@ -294,8 +294,8 @@ globalSearch::GeneticAlgorithm::makeChildren(
 			second.genes.push_back(v1);
 		}
 	}
-	children.at(0) = first;
-	children.at(1) = second;
+	children[0] = first;
+	children[1] = second;
 	return children;
 }
 
@@ -308,7 +308,7 @@ globalSearch::GeneticAlgorithm::mutatePopulation(std::vector<globalSearch::Indiv
 		for (int geneIdx = 0; geneIdx < numberOfGenes_; ++geneIdx) {
 			p = randomRange(0.0, 1.0);
 			if (p < probabilityOfMutation_) {
-				member.genes.at(geneIdx) = nthRandomGene(geneIdx);
+				member.genes[geneIdx] = nthRandomGene(geneIdx);
 			}
 		}
 	}
@@ -331,10 +331,10 @@ globalSearch::GeneticAlgorithm::startReport()
 		} else {
 			std::cout << "  {idx " << i << ", ";
 		}
-		std::cout << "default " << defaultGenes_.at(i) << ", ";
-		std::cout << "continuous? " << continuousFlags_.at(i) << ", ";
-		std::cout << "variable? " << variableFlags_.at(i) << ", ";
-		std::cout << "bounds [" << lowerBounds_.at(i) << ", " << upperBounds_.at(i) << "]}";
+		std::cout << "default " << defaultGenes_[i] << ", ";
+		std::cout << "continuous? " << continuousFlags_[i] << ", ";
+		std::cout << "variable? " << variableFlags_[i] << ", ";
+		std::cout << "bounds [" << lowerBounds_[i] << ", " << upperBounds_[i] << "]}";
 		if (i == numberOfGenes_ - 1) {
 			std::cout << "]}\n";
 		} else {
@@ -386,7 +386,7 @@ globalSearch::GeneticAlgorithm::reportProgress(
 	std::cout << std::setw(14) << std::setprecision(6) << avgFitness << "  ";
 	std::cout << std::setprecision(4) << "[";
 	for (int i=0; i < fittest.genes.size(); ++i) {
-		g = fittest.genes.at(i);
+		g = fittest.genes[i];
 		if (i == fittest.genes.size() - 1) {
 			std::cout << std::setw(4) << g << "]\n";
 		} else {
@@ -412,13 +412,13 @@ globalSearch::GeneticAlgorithm::insertElite(
 {
 	int bestMemberIdx = 0;
 	int worstMemberIdx = 0;
-  double bestFitness = population.at(bestMemberIdx).fitness;
-	double worstFitness = population.at(worstMemberIdx).fitness;
+  double bestFitness = population[bestMemberIdx].fitness;
+	double worstFitness = population[worstMemberIdx].fitness;
 	globalSearch::Individual member, newFittest;
 	double fitNext, fit;
   int i;
   for (i = 0; i < population.size(); ++i) {
-		member = population.at(i);
+		member = population[i];
     if (member.fitness > bestFitness ) {
 			bestFitness = member.fitness;
 			bestMemberIdx = i;
@@ -429,7 +429,7 @@ globalSearch::GeneticAlgorithm::insertElite(
 		}
   }
   if (bestFitness < fittest.fitness) {
-    population.at(worstMemberIdx) = fittest;
+    population[worstMemberIdx] = fittest;
   }
   return;
 }
