@@ -1,5 +1,6 @@
 #ifndef GLOBAL_SEARCH__GENETIC_ALGORITHM_H_
 #define GLOBAL_SEARCH__GENETIC_ALGORITHM_H_
+#include "objective_function.hh"
 #include <random>
 #include <vector>
 #include <array>
@@ -14,13 +15,17 @@ struct Individual
 	double cumulativeFitness;
 };
 
-double exampleObjectiveFunction(std::vector<double>);
+class ExampleObjectiveFunction : public ObjectiveFunction
+{
+	public: // Methods
+		virtual double call(const std::vector<double>& traits);
+};
 
 class GeneticAlgorithm
 {
 	public: // Creation
 		GeneticAlgorithm(
-			double (*objFn)(std::vector<double>),
+			ObjectiveFunction* objFn,
 			std::vector<double> defaultGenes,
 			std::vector<bool> continuousFlags,
 			std::vector<bool> variableFlags,
@@ -53,7 +58,7 @@ class GeneticAlgorithm
 		void insertElite(std::vector<Individual>& population, const Individual& fittest);
 
 	private: // Data
-		double (*objFn_)(std::vector<double>);
+		ObjectiveFunction* objFn_;
 		int numberOfGenes_;
 		std::vector<double> defaultGenes_;
 		std::vector<bool> continuousFlags_;

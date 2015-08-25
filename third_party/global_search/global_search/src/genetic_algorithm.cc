@@ -15,7 +15,7 @@
 #include <array>
 
 double
-globalSearch::exampleObjectiveFunction(std::vector<double> xs)
+globalSearch::ExampleObjectiveFunction::call(const std::vector<double>& xs)
 {
 	double x0 = xs[0];
 	double x1 = xs[1];
@@ -24,7 +24,7 @@ globalSearch::exampleObjectiveFunction(std::vector<double> xs)
 }
 
 globalSearch::GeneticAlgorithm::GeneticAlgorithm(
-	double (*objFn)(std::vector<double>),
+	globalSearch::ObjectiveFunction* objFn,
 	std::vector<double> defaultGenes,
 	std::vector<bool> continuousFlags,
 	std::vector<bool> variableFlags,
@@ -56,7 +56,7 @@ globalSearch::GeneticAlgorithm::GeneticAlgorithm(
 
 globalSearch::GeneticAlgorithm::GeneticAlgorithm() :
 	globalSearch::GeneticAlgorithm::GeneticAlgorithm{
-		&globalSearch::exampleObjectiveFunction,
+		new globalSearch::ExampleObjectiveFunction(),
 		{2.5, 2.5, 0.0},
 		{true, true, true},
 		{true, true, true},
@@ -161,7 +161,7 @@ void
 globalSearch::GeneticAlgorithm::evaluatePopulation(std::vector<globalSearch::Individual>& pop)
 {
 	for (auto &member : pop) {
-		member.fitness = (*objFn_)(member.genes);
+		member.fitness = objFn_->call(member.genes);
 	}
 	return;
 }

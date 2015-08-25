@@ -1,6 +1,7 @@
 set(SRC
   src/genetic_algorithm.hh
   src/genetic_algorithm.cc
+  src/objective_function.hh
 )
 
 #if(CMAKE_COMPILER_IS_GNUCXX)
