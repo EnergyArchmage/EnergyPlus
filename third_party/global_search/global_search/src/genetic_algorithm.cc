@@ -30,8 +30,8 @@ globalSearch::GeneticAlgorithm::GeneticAlgorithm(
 	std::vector<bool> variableFlags,
 	std::vector<double> upperBounds,
 	std::vector<double> lowerBounds,
-	int populationSize,
-	int maximumGenerations,
+	std::size_t populationSize,
+	std::size_t maximumGenerations,
 	double probabilityOfCrossover,
 	double probabilityOfMutation
 ) :
@@ -72,14 +72,18 @@ globalSearch::Individual
 globalSearch::GeneticAlgorithm::run()
 {
 	startReport();
-	std::vector<globalSearch::Individual> population = generateInitialPopulation();
+	std::vector<globalSearch::Individual> population =
+		generateInitialPopulation();
 	std::vector<globalSearch::Individual> nextPopulation;
 	globalSearch::Individual fittest;
 	globalSearch::Individual globalFittest;
 	evaluatePopulation(population);
 	fittest = fittestMemberOf(population);
 	globalFittest = fittest;
-	for (int generation=0; generation < maximumGenerations_; generation++) {
+	std::size_t generation;
+	for (generation=0;
+			generation < maximumGenerations_;
+		 	generation++) {
 		reportProgress(generation, population, fittest);
 		nextPopulation = selectSurvivors(population);
 		assert(populationSize_ == nextPopulation.size());
@@ -136,7 +140,8 @@ std::vector<globalSearch::Individual>
 globalSearch::GeneticAlgorithm::generateInitialPopulation()
 {
 	std::vector<globalSearch::Individual> inds;
-	for (int i=0; i < populationSize_; i++) {
+	std::size_t i;
+	for (i=0; i < populationSize_; i++) {
 		inds.push_back(initIndividual());
 	}
 	return inds;
@@ -146,7 +151,8 @@ globalSearch::Individual
 globalSearch::GeneticAlgorithm::initIndividual()
 {
 	std::vector<double> vars;
-	for (int i = 0; i < numberOfGenes_; ++i) {
+	std::size_t i;
+	for (i = 0; i < numberOfGenes_; ++i) {
 		vars.push_back(nthRandomGene(i));
 	}
 	globalSearch::Individual indy;
@@ -191,9 +197,9 @@ std::vector<globalSearch::Individual>
 globalSearch::GeneticAlgorithm::selectSurvivors(std::vector<globalSearch::Individual>& pop)
 {
 	std::vector<globalSearch::Individual> newPop;
-	int i, j;
+	std::size_t i, j;
 	double p, cf0, cfj, cfjj;
-	int lastIdx = populationSize_ - 1;
+	std::size_t lastIdx = populationSize_ - 1;
 	double cumulativeFitness = 0.0;
 	double totalFitnessOfPopulation = 0.0;
 	for (const auto &member : pop) {
@@ -239,8 +245,8 @@ globalSearch::GeneticAlgorithm::crossover(const std::vector<globalSearch::Indivi
 	std::array<globalSearch::Individual,2> children;
 	bool has_mother = false;
 	double p;
-	int idx = 0;
-	int lastIdx = populationSize_ - 1;
+	std::size_t idx = 0;
+	std::size_t lastIdx = populationSize_ - 1;
 	std::vector<globalSearch::Individual> nextPop;
 	for (const auto &member : pop) {
 		p = randomRange(0.0, 1.0);
@@ -278,7 +284,8 @@ globalSearch::GeneticAlgorithm::makeChildren(
 	double v1, v2, p;
 	auto first = globalSearch::Individual();
 	auto second = globalSearch::Individual();
-	for (int gIdx = 0; gIdx < numberOfGenes_; gIdx++) {
+	std::size_t gIdx;
+	for (gIdx = 0; gIdx < numberOfGenes_; gIdx++) {
 		v1 = mom.genes[gIdx];
 		v2 = dad.genes[gIdx];
 		p = randomRange(0.0, 1.0);
@@ -298,10 +305,10 @@ globalSearch::GeneticAlgorithm::makeChildren(
 void
 globalSearch::GeneticAlgorithm::mutatePopulation(std::vector<globalSearch::Individual>& pop)
 {
-	double p, newValue;
-	bool varFlag;
+	double p;
+	std::size_t geneIdx;
 	for (auto &member : pop) {
-		for (int geneIdx = 0; geneIdx < numberOfGenes_; ++geneIdx) {
+		for (geneIdx = 0; geneIdx < numberOfGenes_; ++geneIdx) {
 			p = randomRange(0.0, 1.0);
 			if (p < probabilityOfMutation_) {
 				member.genes[geneIdx] = nthRandomGene(geneIdx);
@@ -313,6 +320,7 @@ globalSearch::GeneticAlgorithm::mutatePopulation(std::vector<globalSearch::Indiv
 void
 globalSearch::GeneticAlgorithm::startReport()
 {
+	std::size_t i;
 	std::cout << "#globalSearch/GeneticAlgorithm\n";
 	std::cout << "{:population-size " << populationSize_ << "\n";
 	std::cout << " :maximum-generations " << maximumGenerations_ << "\n";
@@ -320,7 +328,7 @@ globalSearch::GeneticAlgorithm::startReport()
 	std::cout << " :probability-of-mutation " << std::setprecision(3) << probabilityOfMutation_ << "\n";
 	std::cout << " :number-of-genes " << numberOfGenes_ << "\n";
 	std::cout << " :genes\n";
-	for (auto i=0; i<numberOfGenes_; ++i) {
+	for (i = 0; i < numberOfGenes_; ++i) {
 		if (i == 0) {
 			std::cout << " [{idx " << i << ", ";
 		} else {
@@ -375,12 +383,13 @@ globalSearch::GeneticAlgorithm::reportProgress(
 	double avgFitness = totalFitness / ((double)populationSize_);
 	double bestFitness = fittest.fitness;
 	double g;
+	std::size_t i;
 	std::cout << std::setw(14) << std::setprecision(6) << generationNumber << "  ";
 	std::cout << std::setw(14) << std::setprecision(6) << bestFitness << "  ";
 	std::cout << std::setw(14) << std::setprecision(6) << totalFitness << "  ";
 	std::cout << std::setw(14) << std::setprecision(6) << avgFitness << "  ";
 	std::cout << std::setprecision(4) << "[";
-	for (int i=0; i < fittest.genes.size(); ++i) {
+	for (i=0; i < fittest.genes.size(); ++i) {
 		g = fittest.genes[i];
 		if (i == fittest.genes.size() - 1) {
 			std::cout << std::setw(4) << g << "]\n";
@@ -410,8 +419,7 @@ globalSearch::GeneticAlgorithm::insertElite(
   double bestFitness = population[bestMemberIdx].fitness;
 	double worstFitness = population[worstMemberIdx].fitness;
 	globalSearch::Individual member, newFittest;
-	double fitNext, fit;
-  int i;
+	std::size_t i;
   for (i = 0; i < population.size(); ++i) {
 		member = population[i];
     if (member.fitness > bestFitness ) {

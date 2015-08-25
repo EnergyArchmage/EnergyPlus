@@ -1,6 +1,7 @@
 #ifndef GLOBAL_SEARCH__GENETIC_ALGORITHM_H_
 #define GLOBAL_SEARCH__GENETIC_ALGORITHM_H_
 #include "objective_function.hh"
+#include <cstdlib>
 #include <random>
 #include <vector>
 #include <array>
@@ -31,8 +32,8 @@ class GeneticAlgorithm
 			std::vector<bool> variableFlags,
 			std::vector<double> upperBounds,
 			std::vector<double> lowerBounds,
-			int populationSize,
-			int maximumGenerations,
+			std::size_t populationSize,
+			std::size_t maximumGenerations,
 			double probabilityOfCrossover,
 			double probabilityOfMutation
 		);
@@ -59,14 +60,14 @@ class GeneticAlgorithm
 
 	private: // Data
 		ObjectiveFunction* objFn_;
-		int numberOfGenes_;
+		std::size_t numberOfGenes_;
 		std::vector<double> defaultGenes_;
 		std::vector<bool> continuousFlags_;
 		std::vector<bool> variableFlags_;
 		std::vector<double> upperBounds_;
 		std::vector<double> lowerBounds_;
-		int populationSize_;
-		int maximumGenerations_;
+		std::size_t populationSize_;
+		std::size_t maximumGenerations_;
 		double probabilityOfCrossover_;
 		double probabilityOfMutation_;
 		std::mt19937 rng_;
