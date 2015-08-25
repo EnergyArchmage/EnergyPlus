@@ -31,7 +31,6 @@ globalSearch::GeneticAlgorithm::GeneticAlgorithm(
 	std::vector<double> upperBounds,
 	std::vector<double> lowerBounds,
 	int populationSize,
-	int eliteSize,
 	int maximumGenerations,
 	double probabilityOfCrossover,
 	double probabilityOfMutation
@@ -43,7 +42,6 @@ globalSearch::GeneticAlgorithm::GeneticAlgorithm(
 	upperBounds_(upperBounds),
 	lowerBounds_(lowerBounds),
 	populationSize_(populationSize),
-	eliteSize_(eliteSize),
 	maximumGenerations_(maximumGenerations),
 	probabilityOfCrossover_(probabilityOfCrossover),
 	probabilityOfMutation_(probabilityOfMutation),
@@ -54,7 +52,6 @@ globalSearch::GeneticAlgorithm::GeneticAlgorithm(
 	assert(numberOfGenes_ == variableFlags_.size());
 	assert(numberOfGenes_ == upperBounds_.size());
 	assert(numberOfGenes_ == lowerBounds_.size());
-	assert(eliteSize_ < populationSize_);
 }
 
 globalSearch::GeneticAlgorithm::GeneticAlgorithm() :
@@ -66,7 +63,6 @@ globalSearch::GeneticAlgorithm::GeneticAlgorithm() :
 		{5.0, 5.0, 2.0},
 		{0.0, 0.0, -2.0},
 		50,
-		1,
 		1000,
 		0.8,
 		0.15}
@@ -320,7 +316,6 @@ globalSearch::GeneticAlgorithm::startReport()
 	std::cout << "#globalSearch/GeneticAlgorithm\n";
 	std::cout << "{:population-size " << populationSize_ << "\n";
 	std::cout << " :maximum-generations " << maximumGenerations_ << "\n";
-	std::cout << " :elite-size " << eliteSize_ << "\n";
 	std::cout << " :probability-of-crossover " << std::setprecision(3) << probabilityOfCrossover_ << "\n";
 	std::cout << " :probability-of-mutation " << std::setprecision(3) << probabilityOfMutation_ << "\n";
 	std::cout << " :number-of-genes " << numberOfGenes_ << "\n";

@@ -27,7 +27,6 @@ class GeneticAlgorithm
 			std::vector<double> upperBounds,
 			std::vector<double> lowerBounds,
 			int populationSize,
-			int eliteSize,
 			int maximumGenerations,
 			double probabilityOfCrossover,
 			double probabilityOfMutation
@@ -62,7 +61,6 @@ class GeneticAlgorithm
 		std::vector<double> upperBounds_;
 		std::vector<double> lowerBounds_;
 		int populationSize_;
-		int eliteSize_;
 		int maximumGenerations_;
 		double probabilityOfCrossover_;
 		double probabilityOfMutation_;
