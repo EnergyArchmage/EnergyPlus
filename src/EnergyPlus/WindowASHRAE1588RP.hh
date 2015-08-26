@@ -7,6 +7,7 @@
 
 // GlobalSearch Header
 #include <objective_function.hh>
+#include <genetic_algorithm.hh>
 
 namespace EnergyPlus {
 
@@ -39,6 +40,9 @@ public: // Methods
 	Json::Value getTraitValueByName(std::string trait, std::string name);
 	std::string getTraitNameByIndex(std::string trait, int index);
 	Json::Value getTraitValueByIndex(std::string trait, int index);
+	bool isContinuous(std::string trait);
+	Real64 getTraitLowerBound(std::string trait);
+	Real64 getTraitUpperBound(std::string trait);
 
 private: // Data
 	Json::Value db;
@@ -72,7 +76,8 @@ class FenSysObjFunc : public globalSearch::ObjectiveFunction
 
 class FenestrationSystem {
 public: // Creation
-	FenestrationSystem(const std::string &constructionName,
+	FenestrationSystem(
+		const std::string &constructionName,
 		const ASHRAE1588Database &db,
 		const Real64 &uFactorTarget,
 		const Real64 &shgcTarget,

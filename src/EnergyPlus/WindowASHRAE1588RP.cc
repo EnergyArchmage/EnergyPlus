@@ -9,6 +9,7 @@
 
 // GlobalSearch Headers
 #include <genetic_algorithm.hh>
+#include <objective_function.hh>
 
 // EnergyPlus Headers
 #include <WindowASHRAE1588RP.hh>
@@ -244,7 +245,10 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 			searchDatabaseKeysForInput(constructionName, "Fenestration Type", typeKeys, ConstructAlphas( 2 ), ErrorsFound);
 			fenestrationTraits.push_back(database.getTraitIndexByName("Types",ConstructAlphas( 2 )));
 		}
-		variableFlags.push_back(true); // Fenestration Type is a variable
+		variableFlags.push_back(false); // Fenestration Type is not a variable
+		continuousFlags.push_back(database.isContinuous("Types"));
+		lowerBounds.push_back(database.getTraitLowerBound("Types"));
+		upperBounds.push_back(database.getTraitUpperBound("Types"));
 
 		// Number of Panes
 		bool numberOfPanesLock;
@@ -252,12 +256,10 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		if ( lNumericFieldBlanks( 3 ) )
 		{
 			numberOfPanesLock = false;
-			variableFlags.push_back(true);
 		}
 		else
 		{
 			numberOfPanesLock = true;
-			variableFlags.push_back(false);
 			std::string panesName = std::to_string(std::lround(ConstructNumerics( 3 )));
 			fenestrationTraits.push_back(database.getTraitIndexByName("Panes",panesName));
 		}
@@ -265,6 +267,10 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		{
 			fenestrationTraits.push_back(database.getTraitIndexWithMaxUtility("Panes"));
 		}
+		variableFlags.push_back(!numberOfPanesLock);
+		continuousFlags.push_back(database.isContinuous("Panes"));
+		lowerBounds.push_back(database.getTraitLowerBound("Panes"));
+		upperBounds.push_back(database.getTraitUpperBound("Panes"));
 
 		// Glazing Thickness
 		bool glazingThicknessLock;
@@ -282,6 +288,10 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		{
 			fenestrationTraits.push_back(database.getContinuousTraitValueWithMaxUtility("Glazing Thickness"));
 		}
+		variableFlags.push_back(!glazingThicknessLock);
+		continuousFlags.push_back(database.isContinuous("Glazing Thickness"));
+		lowerBounds.push_back(database.getTraitLowerBound("Glazing Thickness"));
+		upperBounds.push_back(database.getTraitUpperBound("Glazing Thickness"));
 
 		// Glazing Substrate
 		bool glazingSubstrateLock;
@@ -301,6 +311,10 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		{
 			fenestrationTraits.push_back(database.getTraitIndexWithMaxUtility("Substrates"));
 		}
+		variableFlags.push_back(!glazingSubstrateLock);
+		continuousFlags.push_back(database.isContinuous("Substrates"));
+		lowerBounds.push_back(database.getTraitLowerBound("Substrates"));
+		upperBounds.push_back(database.getTraitUpperBound("Substrates"));
 
 		// Glazing Coating
 		bool glazingCoatingLock;
@@ -320,6 +334,10 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		{
 			fenestrationTraits.push_back(database.getTraitIndexWithMaxUtility("Coatings"));
 		}
+		variableFlags.push_back(!glazingCoatingLock);
+		continuousFlags.push_back(database.isContinuous("Coatings"));
+		lowerBounds.push_back(database.getTraitLowerBound("Coatings"));
+		upperBounds.push_back(database.getTraitUpperBound("Coatings"));
 
 		// Gas Type
 		bool gasTypeLock;
@@ -339,6 +357,10 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		{
 			fenestrationTraits.push_back(database.getTraitIndexWithMaxUtility("Gases"));
 		}
+		variableFlags.push_back(!gasTypeLock);
+		continuousFlags.push_back(database.isContinuous("Gases"));
+		lowerBounds.push_back(database.getTraitLowerBound("Gases"));
+		upperBounds.push_back(database.getTraitUpperBound("Gases"));
 
 		// Gap Thickness
 		bool gapThicknessLock;
@@ -356,6 +378,10 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		{
 			fenestrationTraits.push_back(database.getContinuousTraitValueWithMaxUtility("Gap Thickness"));
 		}
+		variableFlags.push_back(!gapThicknessLock);
+		continuousFlags.push_back(database.isContinuous("Gap Thickness"));
+		lowerBounds.push_back(database.getTraitLowerBound("Gap Thickness"));
+		upperBounds.push_back(database.getTraitUpperBound("Gap Thickness"));
 
 		// Spacer Material Type
 		bool spacerLock;
@@ -375,6 +401,10 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		{
 			fenestrationTraits.push_back(database.getTraitIndexWithMaxUtility("Spacers"));
 		}
+		variableFlags.push_back(!spacerLock);
+		continuousFlags.push_back(database.isContinuous("Spacers"));
+		lowerBounds.push_back(database.getTraitLowerBound("Spacers"));
+		upperBounds.push_back(database.getTraitUpperBound("Spacers"));
 
 		// Frame Material
 		bool frameLock;
@@ -394,6 +424,10 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		{
 			fenestrationTraits.push_back(database.getTraitIndexWithMaxUtility("Frames"));
 		}
+		variableFlags.push_back(!frameLock);
+		continuousFlags.push_back(database.isContinuous("Frames"));
+		lowerBounds.push_back(database.getTraitLowerBound("Frames"));
+		upperBounds.push_back(database.getTraitUpperBound("Frames"));
 
 		// Frame Width
 		bool frameWidthLock;
@@ -412,6 +446,10 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		{
 			fenestrationTraits.push_back(database.getContinuousTraitValueWithMaxUtility("Frame Width"));
 		}
+		variableFlags.push_back(!frameWidthLock);
+		continuousFlags.push_back(database.isContinuous("Frame Width"));
+		lowerBounds.push_back(database.getTraitLowerBound("Frame Width"));
+		upperBounds.push_back(database.getTraitUpperBound("Frame Width"));
 
 		// Divider Width
 		bool dividerWidthLock;
@@ -430,6 +468,10 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		{
 			fenestrationTraits.push_back(0.0);
 		}
+		variableFlags.push_back(false); // hard code divider width as NOT a variable
+		continuousFlags.push_back(true);
+		lowerBounds.push_back(0.0);
+		upperBounds.push_back(std::min(20e-3, fenestrationTraits.at(7)));
 
 		// Dirt Factor
 		Real64 dirtFactor;
@@ -452,11 +494,11 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 			ashrae1588FileName = ConstructAlphas(8);
 		}
 
-	 // Check for Errors
-	 if ( ErrorsFound ) {
-		 std::cout << "Error found in processing ASHRAE 1588 window construction input." << std::endl;
-		 ShowFatalError( "Error found in processing ASHRAE 1588 window construction input." );
-	 }
+	// Check for Errors
+	if ( ErrorsFound ) {
+		std::cout << "Error found in processing ASHRAE 1588 window construction input." << std::endl;
+		ShowFatalError( "Error found in processing ASHRAE 1588 window construction input." );
+	}
 
 		Construct( 1 ).Name = constructionName;
 		Construct( 1 ).TypeIsWindow = true;
@@ -486,18 +528,23 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 
 		auto fsObjFn = FenSysObjFunc(constructionName, database, uFactorTarget, shgcTarget);
 		auto ga = globalSearch::GeneticAlgorithm(
-				fsObjFn&,
+				&fsObjFn,
 				fenestrationTraits,
-				std::vector<bool> continuousFlags,
-				std::vector<bool> variableFlags,
-				std::vector<double> upperBounds,
-				std::vector<double> lowerBounds,
+				continuousFlags,
+				variableFlags,
+				upperBounds,
+				lowerBounds,
 				populationSize,
 				maximumGenerations,
 				probabilityOfCrossover,
 				probabilityOfMutation);
-		auto optimalFenestrationTraits = ga.run();
-		auto fs = FenestrationSystem(constructionName, database, uFactorTarget, shgcTarget, optimalFenestrationTraits);
+		globalSearch::Individual optimalFenestrationTraits = ga.run();
+		auto fs = FenestrationSystem(
+				constructionName,
+				database,
+				uFactorTarget,
+				shgcTarget,
+				optimalFenestrationTraits.genes);
 		fs.calculate();
 
 		ASHRAE1588RP_Flag = false;
@@ -1675,6 +1722,33 @@ Json::Value ASHRAE1588Database::getTraitValueByIndex(std::string trait, int inde
 	return db["Traits"][trait][index]["Value"];
 }
 
+bool
+ASHRAE1588Database::isContinuous(std::string trait)
+{
+	Json::Value &traitNode = db["Traits"][trait];
+	return traitNode.isMember("Distribution");
+}
+
+Real64
+ASHRAE1588Database::getTraitLowerBound(std::string trait)
+{
+	if (isContinuous(trait)) {
+		Json::Value &traitNode = db["Traits"][trait];
+		return traitNode["Min"].asDouble();
+	}
+	return 0.0;
+}
+
+Real64
+ASHRAE1588Database::getTraitUpperBound(std::string trait)
+{
+	Json::Value &traitNode = db["Traits"][trait];
+	if (isContinuous(trait)) {
+		return traitNode["Max"].asDouble();
+	}
+	return Real64(traitNode.size() - 1);
+}
+
 FenSysObjFunc::FenSysObjFunc(
 		const std::string& constructionName,
 		const ASHRAE1588Database& database,
@@ -1693,6 +1767,58 @@ FenSysObjFunc::call(const std::vector<Real64>& fenestrationTraits)
 	fs.calculate();
 	return -1.0 * fs.error;
 }
+
+// void
+// setupField(
+// 		const int fieldIdx,
+// 	 	const bool isAlpha,
+// 		const std::string& databaseKey,
+// 		const std::string& traitName,
+// 		const std::string& constructionName,
+// 		const ASHRAE1588Database& database,
+// 	 	std::vector<Real64>& fenestrationTraits,
+// 		std::vector<bool> variableFlags,
+// 		std::vector<bool> continuousFlags
+// )
+// {
+// 	bool lock;
+// 	bool continuous = database.isContinuous(traitName);
+// 	if (isAlpha) {
+// 		if ( lAlphaFieldBlanks( fieldIdx ) ) {
+// 			lock = false;
+// 			if ( continuous ) {
+// 				fenestrationTraits.push_back(database.getContinuousTraitValueWithMaxUtility(traitName));
+// 			} else {
+// 				fenestrationTraits.push_back(database.getTraitIndexWithMaxUtility(traitName));
+// 			}
+// 		} else {
+// 			lock = true;
+// 			searchDatabaseKeysForInput(constructionName, databaseKey, typeKeys, ConstructAlphas( fieldIdx ), ErrorsFound);
+// 			fenestrationTraits.push_back(database.getTraitIndexByName(traitName, ConstructAlphas( fieldIdx )));
+// 		}
+// 	} else {
+// 		if ( lNumericFieldBlanks( fieldIdx ) ) {
+// 			lock = false;
+// 			if ( isContinuous ) {
+// 				fenestrationTraits.push_back(database.getContinuousTraitValueWithMaxUtility(traitName));
+// 			} else {
+// 				fenestrationTraits.push_back(database.getTraitIndexWithMaxUtility(traitName));
+// 			}
+// 		} else {
+// 			lock = true;
+// 			if ( continuous ) {
+// 				std::string name = std::to_string(std::lround(ConstructNumerics( fieldIdx )));
+// 				fenestrationTraits.push_back(database.getTraitIndexByName(traitName, name));
+// 			} else {
+// 				fenestrationTraits.push_back(ConstructNumerics(fieldIdx));
+// 			}
+// 		}
+// 	}
+// 	variableFlags.push_back(!lock);
+//	continuousFlags.push_back(database.isContinuous(traitName));
+//	lowerBounds.push_back(database.getTraitLowerBound(traitName));
+//	upperBounds.push_back(database.getTraitUpperBound(traitName));
+// }
 
 } // WindowASHRAE1588RP
 
