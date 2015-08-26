@@ -500,9 +500,6 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		ShowFatalError( "Error found in processing ASHRAE 1588 window construction input." );
 	}
 
-		Construct( 1 ).Name = constructionName;
-		Construct( 1 ).TypeIsWindow = true;
-
 		// Save Frame and Divider objects
 		int TotFrameDividerSave = TotFrameDivider;
 		Array1D< FrameDividerProperties > FrameDividerSave;
@@ -512,11 +509,7 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 
 		FrameDivider.deallocate();
 
-
 		// Allocate temporary arrays
-		createDummyVariables();
-
-		Surface( 1 ).Name = constructionName + ":Surface";
 
 		ASHRAE1588RP_Flag = true;
 		KickOffSimulation = false;
@@ -562,7 +555,6 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		}
 
 		// deallocate temporary arrays
-		removeDummyVariables();
 
 		// Restore Spectral Data list and copy in new spectral data
 		{
@@ -843,6 +835,13 @@ FenestrationSystem::FenestrationSystem(
 
 void
 FenestrationSystem::calculate() {
+
+	createDummyVariables();
+
+	Construct( 1 ).Name = constructionName;
+	Construct( 1 ).TypeIsWindow = true;
+
+	Surface( 1 ).Name = constructionName + ":Surface";
 
 	bool ErrorsFound = false;
 	int spectralDataSize = database.wavelengths.size();
@@ -1298,6 +1297,7 @@ FenestrationSystem::calculate() {
 	Real64 opticalMatchTolerance = 0.01; // Precision of NFRC reporting TODO expose?
 
 	matched = (std::abs(uFactorDiff) < uFactorMatchTolerance) && (std::abs(shgcDiff) < opticalMatchTolerance);
+	removeDummyVariables();
 
 } // calculate
 
