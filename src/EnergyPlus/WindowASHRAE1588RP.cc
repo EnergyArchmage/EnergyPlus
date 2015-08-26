@@ -7,6 +7,9 @@
 #include <ObjexxFCL/gio.hh>
 #include <ObjexxFCL/Fmath.hh>
 
+// GlobalSearch Headers
+#include <genetic_algorithm.hh>
+
 // EnergyPlus Headers
 #include <WindowASHRAE1588RP.hh>
 #include <ConvectionCoefficients.hh>
@@ -226,6 +229,10 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 
 		// set locks as appropriate.
 		std::vector<Real64> fenestrationTraits;
+		std::vector<bool> variableFlags;
+		std::vector<bool> continuousFlags;
+		std::vector<double> upperBounds;
+		std::vector<double> lowerBounds;
 
 		// Fenestration Type
 		if ( lAlphaFieldBlanks( 2 ) )
@@ -237,6 +244,7 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 			searchDatabaseKeysForInput(constructionName, "Fenestration Type", typeKeys, ConstructAlphas( 2 ), ErrorsFound);
 			fenestrationTraits.push_back(database.getTraitIndexByName("Types",ConstructAlphas( 2 )));
 		}
+		variableFlags.push_back(true); // Fenestration Type is a variable
 
 		// Number of Panes
 		bool numberOfPanesLock;
@@ -244,10 +252,12 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		if ( lNumericFieldBlanks( 3 ) )
 		{
 			numberOfPanesLock = false;
+			variableFlags.push_back(true);
 		}
 		else
 		{
 			numberOfPanesLock = true;
+			variableFlags.push_back(false);
 			std::string panesName = std::to_string(std::lround(ConstructNumerics( 3 )));
 			fenestrationTraits.push_back(database.getTraitIndexByName("Panes",panesName));
 		}
@@ -469,7 +479,25 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		ASHRAE1588RP_Flag = true;
 		KickOffSimulation = false;
 
-		auto fs = FenestrationSystem(constructionName, database, uFactorTarget, shgcTarget, fenestrationTraits);
+		std::size_t populationSize{50};
+		std::size_t maximumGenerations{1000};
+		Real64 probabilityOfCrossover{0.8};
+		Real64 probabilityOfMutation{0.15};
+
+		auto fsObjFn = FenSysObjFunc(constructionName, database, uFactorTarget, shgcTarget);
+		auto ga = globalSearch::GeneticAlgorithm(
+				fsObjFn&,
+				fenestrationTraits,
+				std::vector<bool> continuousFlags,
+				std::vector<bool> variableFlags,
+				std::vector<double> upperBounds,
+				std::vector<double> lowerBounds,
+				populationSize,
+				maximumGenerations,
+				probabilityOfCrossover,
+				probabilityOfMutation);
+		auto optimalFenestrationTraits = ga.run();
+		auto fs = FenestrationSystem(constructionName, database, uFactorTarget, shgcTarget, optimalFenestrationTraits);
 		fs.calculate();
 
 		ASHRAE1588RP_Flag = false;
@@ -1645,6 +1673,25 @@ Json::Value ASHRAE1588Database::getTraitValueByName(std::string trait, std::stri
 
 Json::Value ASHRAE1588Database::getTraitValueByIndex(std::string trait, int index) {
 	return db["Traits"][trait][index]["Value"];
+}
+
+FenSysObjFunc::FenSysObjFunc(
+		const std::string& constructionName,
+		const ASHRAE1588Database& database,
+		const Real64& uFactorTarget,
+		const Real64& shgcTarget) :
+	constructionName_(constructionName),
+	database_(database),
+	uFactorTarget_(uFactorTarget),
+	shgcTarget_(shgcTarget)
+{}
+
+Real64
+FenSysObjFunc::call(const std::vector<Real64>& fenestrationTraits)
+{
+	auto fs = FenestrationSystem(constructionName_, database_, uFactorTarget_, shgcTarget_, fenestrationTraits);
+	fs.calculate();
+	return -1.0 * fs.error;
 }
 
 } // WindowASHRAE1588RP

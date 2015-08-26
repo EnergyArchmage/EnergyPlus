@@ -5,6 +5,9 @@
 // JSON Header
 #include <json/json.h>
 
+// GlobalSearch Header
+#include <objective_function.hh>
+
 namespace EnergyPlus {
 
 namespace WindowASHRAE1588RP {
@@ -46,6 +49,25 @@ public: // Data
 	std::vector <Real64> solarSpectrum;
 	std::vector <Real64> photopicResponse;
 
+};
+
+class FenSysObjFunc : public globalSearch::ObjectiveFunction
+{
+	public: // Creation
+		FenSysObjFunc(
+				const std::string& constructionName,
+				const ASHRAE1588Database& database,
+				const Real64& uFactorTarget,
+				const Real64& shgcTarget);
+
+	public: // Methods
+		virtual Real64 call(const std::vector<Real64>& fenestrationTraits);
+
+	private: // Data
+		std::string constructionName_;
+		ASHRAE1588Database database_;
+		Real64 uFactorTarget_;
+		Real64 shgcTarget_;
 };
 
 class FenestrationSystem {
