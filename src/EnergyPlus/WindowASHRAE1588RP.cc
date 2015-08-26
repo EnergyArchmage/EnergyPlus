@@ -5,6 +5,7 @@
 
 // ObjexxFCL Headers
 #include <ObjexxFCL/gio.hh>
+#include <ObjexxFCL/Fmath.hh>
 
 // EnergyPlus Headers
 #include <WindowASHRAE1588RP.hh>
@@ -62,7 +63,7 @@ void
 CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 {
 
-	bool stand_alone_analysis = true;	// TODO preprocess this for special executable
+	bool standAloneAnalysis = true;	// TODO preprocess this for special executable
 
 	// First read location of the 1588 database file
 	if ( GetNumObjectsFound( "DatabaseFile:WindowASHRAE1588RP" ) > 1 ) {
@@ -75,28 +76,27 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		ShowFatalError( "There is no DatabaseFile:WindowASHRAE1588RP object. There must be a DatabaseFile:WindowASHRAE1588RP if your input file contains any Construction:WindowASHRAE1588RP objects." );
 	}
 
-	int database_num_alpha;
-	int database_num_numeric;
-	Array1D_string database_alphas( 1 ); // Alpha values array
-	Array1D< Real64 > database_numerics( 0 ); // Numeric values array
+	int databaseNumAlpha;
+	int databaseNumNumeric;
+	Array1D_string databaseAlphas( 1 ); // Alpha values array
+	Array1D< Real64 > databaseNumerics( 0 ); // Numeric values array
 	int IOStat; // IO Status when calling get input subroutine
 
-	GetObjectItem( "DatabaseFile:WindowASHRAE1588RP", 1, database_alphas, database_num_alpha, database_numerics, database_num_numeric, IOStat, lNumericFieldBlanks, lAlphaFieldBlanks, cAlphaFieldNames, cNumericFieldNames );
+	GetObjectItem( "DatabaseFile:WindowASHRAE1588RP", 1, databaseAlphas, databaseNumAlpha, databaseNumerics, databaseNumNumeric, IOStat, lNumericFieldBlanks, lAlphaFieldBlanks, cAlphaFieldNames, cNumericFieldNames );
 
-	std::string db_1588_file_path_input = database_alphas( 1 );
-	std::string db_1588_file_path;
+	std::string db1588FilePathInput = databaseAlphas( 1 );
+	std::string db1588FilePath;
 	bool exists;
 
-	std::string RoutineName = "WindowASHRAE1588RP";
-	CheckForActualFileName( db_1588_file_path_input, exists, db_1588_file_path );
+	CheckForActualFileName( db1588FilePathInput, exists, db1588FilePath );
 	if ( ! exists ) {
-		ShowSevereError( "WindowASHRAE1588RP: Could not locate the ASHRAE 1588 window database, expecting it as file name=" + db_1588_file_path_input );
+		ShowSevereError( "WindowASHRAE1588RP: Could not locate the ASHRAE 1588 window database, expecting it as file name=" + db1588FilePathInput );
 		ShowContinueError( "Certain run environments require a full path to be included with the file name in the input field." );
 		ShowContinueError( "Try again with putting full path and file name in the field." );
 		ShowFatalError( "Program terminates due to these conditions." );
 	}
 
-	auto database = ASHRAE1588Database(read_1588_database(db_1588_file_path));
+	auto database = ASHRAE1588Database(read_1588_database(db1588FilePath));
 
 	// Get list of Coatings from the database
 	std::vector < std::string > coating_keys = database.getTraitOptions("Coatings");
@@ -116,18 +116,7 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 	// Get list of Gases from the database
 	std::vector < std::string > gas_keys = database.getTraitOptions("Gases");
 
-	// Set testing conditions
-	Real64 u_indoor_temp = database.tests["U-factor"]["Indoor Temperature"].asDouble();
-	Real64 u_outdoor_temp = database.tests["U-factor"]["Outdoor Temperature"].asDouble();
-	Real64 u_wind_speed = database.tests["U-factor"]["Wind Speed"].asDouble();
-	Real64 u_solar = database.tests["U-factor"]["Solar Incidence"].asDouble();
 
-	Real64 s_indoor_temp = database.tests["SHGC"]["Indoor Temperature"].asDouble();
-	Real64 s_outdoor_temp = database.tests["SHGC"]["Outdoor Temperature"].asDouble();
-	Real64 s_wind_speed = database.tests["SHGC"]["Wind Speed"].asDouble();
-	Real64 s_solar = database.tests["SHGC"]["Solar Incidence"].asDouble();
-
-	int spectral_data_size = database.wavelengths.size();
 
 	int ConstructNumAlpha; // Number of construction alpha names being passed
 	int ConstructNumNumeric; // dummy variable for properties being passed
@@ -135,24 +124,13 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 	Array1D< Real64 > ConstructNumerics( 8 ); // Temporary array to transfer construction properties
 	bool ErrorInName;
 	bool IsBlank;
-	int Loop;
 
 	int TotWinASHRAE1588Constructs = GetNumObjectsFound( "Construction:WindowASHRAE1588RP" ); // Number of window constructions based on ASHRAE 1588RP
 
 	CurrentModuleObject = "Construction:WindowASHRAE1588RP";
 
-	int old_progress_length = 0;
-	if (stand_alone_analysis) {
-		std::cout << "Generating ASHRAE 1588 Construction(s): ";
-	}
+	for ( int Loop = 1; Loop <= TotWinASHRAE1588Constructs; ++Loop ) { // Loop through all WindowASHRAE1588RP constructions.
 
-	for ( Loop = 1; Loop <= TotWinASHRAE1588Constructs; ++Loop ) { // Loop through all WindowASHRAE1588RP constructions.
-
-		if (stand_alone_analysis) {
-			std::string progress = std::to_string(Loop) + "/" + std::to_string(TotWinASHRAE1588Constructs);
-			std::cout << std::string(old_progress_length, '\b') << progress << std::flush;
-			old_progress_length = progress.size();
-		}
 		//Get the object names for each construction from the input processor
 		GetObjectItem( CurrentModuleObject, Loop, ConstructAlphas, ConstructNumAlpha, ConstructNumerics, ConstructNumNumeric, IOStat, lNumericFieldBlanks, lAlphaFieldBlanks, cAlphaFieldNames, cNumericFieldNames );
 
@@ -179,12 +157,6 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		Material.deallocate();
 		NominalR.deallocate();
 
-		int number_of_gaps;
-		int number_of_new_materials;
-
-		Array1D< MaterialProperties > new_materials;
-		Array1D< Real64 > new_nominal_R;
-
 		// Read spectral data from database
 
 		// Save Spectral Data
@@ -194,8 +166,6 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		SpectralDataSave = SpectralData;
 		SpectralData.deallocate();
 
-		Array1D< SpectralDataProperties > new_spectraldata;
-		int num_spectral_datasets;
 
 		// Save Constructions -- The list will be deleted so that the only
 		// construction is the one currently being set for any borrowed subroutines
@@ -223,74 +193,70 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 			TotConstructs = 1;
 		}
 
-
-		ConstructionData new_construct;
-
 		// Name
-		std::string construction_name = ConstructAlphas( 1 );
+		std::string constructionName = ConstructAlphas( 1 );
 
 		// U-factor
-		Real64 target_u_factor;
-		bool u_factor_set;
+		Real64 uFactorTarget;
+		bool uFactorSet;
 
 		if ( lNumericFieldBlanks( 1 ) )
 		{
-			u_factor_set = false;
+			uFactorSet = false;
 		}
 		else
 		{
-			u_factor_set = true;
-			target_u_factor = ConstructNumerics( 1 );
+			uFactorSet = true;
+			uFactorTarget = ConstructNumerics( 1 );
 		}
 
 		// SHGC
-		Real64 target_shgc;
-		bool shgc_set;
+		Real64 shgcTarget;
+		bool shgcSet;
 
 		if ( lNumericFieldBlanks( 2 ) )
 		{
-			shgc_set = false;
+			shgcSet = false;
 		}
 		else
 		{
-			shgc_set = true;
-			target_shgc = ConstructNumerics( 2 );
+			shgcSet = true;
+			shgcTarget = ConstructNumerics( 2 );
 		}
-		// set initial values and set locks as appropriate. If IDF is blank,
-		// override with defaults from ASHRAE 1588 RP Database file (TODO)
+
+		// set locks as appropriate.
+		std::vector<Real64> fenestrationTraits;
 
 		// Fenestration Type
-		std::string fenestration_type;
 		if ( lAlphaFieldBlanks( 2 ) )
 		{
-			fenestration_type = database.getTraitNameWithMaxUtility("Types");
+			fenestrationTraits.push_back(database.getTraitIndexWithMaxUtility("Types"));
 		}
 		else
 		{
-			fenestration_type = ConstructAlphas( 2 );
-			search_database_keys_for_input(construction_name, "Fenestration Type", type_keys, fenestration_type, ErrorsFound);
+			search_database_keys_for_input(constructionName, "Fenestration Type", type_keys, ConstructAlphas( 2 ), ErrorsFound);
+			fenestrationTraits.push_back(database.getTraitIndexByName("Types",ConstructAlphas( 2 )));
 		}
 
 		// Number of Panes
-		int number_of_panes;
-		bool number_of_panes_lock;
+		bool numberOfPanes_lock;
 
 		if ( lNumericFieldBlanks( 3 ) )
 		{
-			number_of_panes_lock = false;
+			numberOfPanes_lock = false;
 		}
 		else
 		{
-			number_of_panes_lock = true;
-			number_of_panes = ConstructNumerics( 3 );
+			numberOfPanes_lock = true;
+			std::string panesName = std::to_string(ConstructNumerics( 3 )).substr(0,1);
+			fenestrationTraits.push_back(database.getTraitIndexByName("Panes",panesName));
 		}
-		if ( ! number_of_panes_lock )
+		if ( ! numberOfPanes_lock )
 		{
-			number_of_panes = database.getDiscreteTraitValueWithMaxUtility("Panes").asInt();
+			fenestrationTraits.push_back(database.getTraitIndexWithMaxUtility("Panes"));
 		}
 
 		// Glazing Thickness
-		Real64 glass_thickness;
 		bool glass_thickness_lock;
 		if ( lNumericFieldBlanks( 4 ) )
 		{
@@ -299,16 +265,15 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		else
 		{
 			glass_thickness_lock = true;
-			glass_thickness = ConstructNumerics( 4 );
+			fenestrationTraits.push_back(ConstructNumerics( 4 ));
 		}
 
 		if ( ! glass_thickness_lock )
 		{
-			glass_thickness = database.getContinuousTraitValueWithMaxUtility("Glazing Thickness");
+			fenestrationTraits.push_back(database.getContinuousTraitValueWithMaxUtility("Glazing Thickness"));
 		}
 
 		// Glazing Substrate
-		std::string glazing_substrate;
 		bool glazing_substrate_lock;
 
 		if ( lAlphaFieldBlanks( 3 ) )
@@ -318,17 +283,16 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		else
 		{
 			glazing_substrate_lock = true;
-			glazing_substrate = ConstructAlphas( 3 );
-			search_database_keys_for_input(construction_name, "Glazing Substrate Type", substrate_keys, glazing_substrate, ErrorsFound);
+			search_database_keys_for_input(constructionName, "Glazing Substrate Type", substrate_keys, ConstructAlphas( 3 ), ErrorsFound);
+			fenestrationTraits.push_back(database.getTraitIndexByName("Substrates",ConstructAlphas( 3 )));
 		}
 
 		if (! glazing_substrate_lock )
 		{
-			glazing_substrate = database.getTraitNameWithMaxUtility("Substrates");
+			fenestrationTraits.push_back(database.getTraitIndexWithMaxUtility("Substrates"));
 		}
 
 		// Glazing Coating
-		std::string glazing_coating;
 		bool glazing_coating_lock;
 
 		if ( lAlphaFieldBlanks( 4 ) )
@@ -338,17 +302,16 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		else
 		{
 			glazing_coating_lock = true;
-			glazing_coating = ConstructAlphas( 4 );
-			search_database_keys_for_input(construction_name, "Glazing Coating Type", coating_keys, glazing_coating, ErrorsFound);
+			search_database_keys_for_input(constructionName, "Glazing Coating Type", coating_keys, ConstructAlphas( 4 ), ErrorsFound);
+			fenestrationTraits.push_back(database.getTraitIndexByName("Coatings",ConstructAlphas( 4 )));
 		}
 
 		if (! glazing_coating_lock )
 		{
-			glazing_coating = database.getTraitNameWithMaxUtility("Coatings");
+			fenestrationTraits.push_back(database.getTraitIndexWithMaxUtility("Coatings"));
 		}
 
 		// Gas Type
-		std::string gas_type;
 		bool gas_type_lock;
 
 		if ( lAlphaFieldBlanks( 5 ) )
@@ -358,17 +321,16 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		else
 		{
 			gas_type_lock = true;
-			gas_type = ConstructAlphas( 5 );
-			search_database_keys_for_input(construction_name, "Gas Type", gas_keys, gas_type, ErrorsFound);
+			search_database_keys_for_input(constructionName, "Gas Type", gas_keys, ConstructAlphas( 5 ), ErrorsFound);
+			fenestrationTraits.push_back(database.getTraitIndexByName("Gases",ConstructAlphas( 5 )));
 		}
 
 		if (! gas_type_lock )
 		{
-			gas_type = database.getTraitNameWithMaxUtility("Gases");
+			fenestrationTraits.push_back(database.getTraitIndexWithMaxUtility("Gases"));
 		}
 
 		// Gap Thickness
-		Real64 gap_thickness;
 		bool gap_thickness_lock;
 		if ( lNumericFieldBlanks( 5 ) )
 		{
@@ -377,16 +339,15 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		else
 		{
 			gap_thickness_lock = true;
-			gap_thickness = ConstructNumerics( 5 );
+			fenestrationTraits.push_back(ConstructNumerics( 5 ));
 		}
 
 		if ( ! gap_thickness_lock )
 		{
-			gap_thickness = database.getContinuousTraitValueWithMaxUtility("Gap Thickness");
+			fenestrationTraits.push_back(database.getContinuousTraitValueWithMaxUtility("Gap Thickness"));
 		}
 
 		// Spacer Material Type
-		std::string spacer_type;
 		bool spacer_type_lock;
 
 		if ( lAlphaFieldBlanks( 6 ) )
@@ -396,17 +357,16 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		else
 		{
 			spacer_type_lock = true;
-			spacer_type = ConstructAlphas( 6 );
-			search_database_keys_for_input(construction_name, "Spacer Material Type", spacer_keys, spacer_type, ErrorsFound);
+			search_database_keys_for_input(constructionName, "Spacer Material Type", spacer_keys, ConstructAlphas( 6 ), ErrorsFound);
+			fenestrationTraits.push_back(database.getTraitIndexByName("Spacers",ConstructAlphas( 6 )));
 		}
 
 		if (! spacer_type_lock )
 		{
-			spacer_type = database.getTraitNameWithMaxUtility("Spacers");
+			fenestrationTraits.push_back(database.getTraitIndexWithMaxUtility("Spacers"));
 		}
 
 		// Frame Material
-		std::string frame_material;
 		bool frame_material_lock;
 
 		if ( lAlphaFieldBlanks( 7 ) )
@@ -416,51 +376,49 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		else
 		{
 			frame_material_lock = true;
-			frame_material = ConstructAlphas( 7 );
-			search_database_keys_for_input(construction_name, "Frame Material Type", frame_keys, frame_material, ErrorsFound);
+			search_database_keys_for_input(constructionName, "Frame Material Type", frame_keys, ConstructAlphas( 7 ), ErrorsFound);
+			fenestrationTraits.push_back(database.getTraitIndexByName("Frames",ConstructAlphas( 7 )));
 		}
 
 		if (! frame_material_lock )
 		{
-			frame_material = database.getTraitNameWithMaxUtility("Frames");
+			fenestrationTraits.push_back(database.getTraitIndexWithMaxUtility("Frames"));
 		}
 
 		// Frame Width
-		Real64 frame_width;
-		bool frame_width_lock;
+		bool frameWidth_lock;
 
 		if ( lNumericFieldBlanks( 6 ) )
 		{
-			frame_width_lock = false;
+			frameWidth_lock = false;
 		}
 		else
 		{
-			frame_width_lock = true;
-			frame_width = ConstructNumerics( 6 );
+			frameWidth_lock = true;
+			fenestrationTraits.push_back(ConstructNumerics( 6 ));
 		}
 
-		if (! frame_width_lock )
+		if (! frameWidth_lock )
 		{
-			frame_width = database.getContinuousTraitValueWithMaxUtility("Frame Width");
+			fenestrationTraits.push_back(database.getContinuousTraitValueWithMaxUtility("Frame Width"));
 		}
 
 		// Divider Width
-		Real64 divider_width;
-		bool divider_width_lock;
+		bool dividerWidth_lock;
 
 		if ( lNumericFieldBlanks( 7 ) )
 		{
-			divider_width_lock = false;
+			dividerWidth_lock = false;
 		}
 		else
 		{
-			divider_width_lock = true;
-			divider_width = ConstructNumerics( 7 );
+			dividerWidth_lock = true;
+			fenestrationTraits.push_back(ConstructNumerics( 7 ));
 		}
 
-		if (! divider_width_lock )
+		if (! dividerWidth_lock )
 		{
-			divider_width = 0.0;
+			fenestrationTraits.push_back(0.0);
 		}
 
 		// Dirt Factor
@@ -490,8 +448,8 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		 ShowFatalError( "Error found in processing ASHRAE 1588 window construction input." );
 	 }
 
-		new_construct.Name = construction_name;
-		new_construct.TypeIsWindow = true;
+		Construct( 1 ).Name = constructionName;
+		Construct( 1 ).TypeIsWindow = true;
 
 		// Save Frame and Divider objects
 		int TotFrameDividerSave = TotFrameDivider;
@@ -502,518 +460,17 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 
 		FrameDivider.deallocate();
 
-		FrameDivider.allocate(1);
-
-		TotFrameDivider = 1;
-
-		FrameDividerProperties new_frame_divider;
-
-		Real64 frame_solar_absorptivity;
-		Real64 frame_visible_absorptivity;
-
-
-		// internal defaults based on other values
-		Real64 frame_conductance;
-		Real64 frame_edge_ratio;
-
-		Real64 fenestration_width;
-		Real64 fenestration_height;
-		Real64 glazing_width;
-		Real64 glazing_height;
-		Real64 tilt;
-		Real64 fenestration_area;
-		Real64 glazing_area;
-		Real64 frame_area;
-
-		bool has_frame;
-		int num_horizontal_dividers;
-		int num_vertical_dividers;
-
-		// matching variables
-		Real64 u_factor;
-		Real64 u_cog;
-		Real64 u_eog;
-		Real64 shgc;
-		Real64 vt;
-
-		// internal defaults to be left alone
-		Real64 frame_IR_emissivity = 0.9;
-
-		Real64 max_divider_spacing = 0.3; // NFRC 100-2014 4.2.2 (B)
-		Real64 edge_width = 0.06355;
 
 		// Allocate temporary arrays
 		create_dummy_variables();
 
-		Surface( 1 ).Name = construction_name + ":Surface";
+		Surface( 1 ).Name = constructionName + ":Surface";
 
 		ASHRAE1588RP_Flag = true;
 		KickOffSimulation = false;
 
-		Real64 u_factor_match_tolerance = 0.05; // Precision of NFRC reporting TODO expose?
-		Real64 optical_match_tolerance = 0.01; // Precision of NFRC reporting TODO expose?
-
-		Real64 u_factor_diff;
-		Real64 shgc_diff;
-
-		bool target_matched = false;
-
-		// This is where the iterative optimization loop will begin
-		Json::Value fenestrationTypeValue;
-		Json::Value spacerTypeValue;
-		Json::Value frameMaterialValue;
-
-		Json::Value substrateValue;
-		Json::Value coatingValue;
-
-		Json::Value gasValue;
-
-		while (! target_matched)
-		{
-			fenestrationTypeValue = database.getTraitValueByName("Types",fenestration_type);
-			spacerTypeValue = database.getTraitValueByName("Spacers",spacer_type);
-			frameMaterialValue = database.getTraitValueByName("Frames",frame_material);
-
-			substrateValue = database.getTraitValueByName("Substrates",glazing_substrate);
-			coatingValue = database.getTraitValueByName("Coatings",glazing_coating);
-
-			gasValue = database.getTraitValueByName("Gases",gas_type);
-
-			frame_solar_absorptivity = fenestrationTypeValue["Frame Absorptivity"].asDouble();
-			frame_visible_absorptivity = fenestrationTypeValue["Frame Absorptivity"].asDouble();
-
-			Real64 frame_u_factor;
-			std::string fenestration_category = fenestrationTypeValue["Category"].asString();
-			if ( spacerTypeValue["Metal"].asBool() ) {
-				frame_u_factor = frameMaterialValue["Metal Spacer"][fenestration_category][std::min(number_of_panes,3)-1].asDouble();
-			}
-			else {
-				frame_u_factor = frameMaterialValue["Non-Metal Spacer"][fenestration_category][std::min(number_of_panes,3)-1].asDouble();
-			}
-
-			Real64 assumed_h_o = 30;	// W/m2-K
-			Real64 assumed_h_i = 8;	// W/m2-K
-			if ( (1/assumed_h_o + 1/assumed_h_i) >= (1/frame_u_factor) ) {
-				frame_conductance = 9999999;
-			}
-			else {
-				frame_conductance = 1/(1/frame_u_factor - (1/assumed_h_o + 1/assumed_h_i));
-			}
-
-			fenestration_width = fenestrationTypeValue["Width"].asDouble();
-			fenestration_height = fenestrationTypeValue["Height"].asDouble();
-			tilt = fenestrationTypeValue["Tilt"].asDouble()*Pi/180.0;
-
-			if ( frame_width > 0.0 )
-			{
-				has_frame = true;
-			}
-			else
-			{
-				has_frame = false;
-			}
-
-			fenestration_area = fenestration_width*fenestration_height;
-			glazing_width = fenestration_width - 2.0*frame_width;
-			glazing_height = fenestration_height - 2.0*frame_width;
-			glazing_area = glazing_width*glazing_height;
-
-			if ( has_frame && divider_width > 0.0)
-			{
-				num_horizontal_dividers = ceil(glazing_height/max_divider_spacing);
-				num_vertical_dividers = ceil(glazing_width/max_divider_spacing);
-			}
-			else
-			{
-				num_horizontal_dividers = 0;
-				num_vertical_dividers = 0;
-			}
-
-
-			Surface( 1 ).Height = glazing_height;
-			Surface( 1 ).Width = glazing_width;
-			Surface( 1 ).Area = glazing_area;
-			Surface( 1 ).Tilt = tilt*180/Pi;
-			Surface( 1 ).CosTilt = cos(tilt);
-			Surface( 1 ).SinTilt = sin(tilt);
-			Surface( 1 ).ViewFactorSky = 0.5 * ( 1.0 + Surface( 1 ).CosTilt );
-			Surface( 1 ).ViewFactorGround = 0.5 * ( 1.0 - Surface( 1 ).CosTilt );
-			Surface( 1 ).ViewFactorSkyIR = Surface( 1 ).ViewFactorSky;
-			Surface( 1 ).ViewFactorGroundIR = Surface( 1 ).ViewFactorGround;
-			AirSkyRadSplit( 1 ) = std::sqrt( 0.5 * ( 1.0 + Surface( 1 ).CosTilt ) );
-
-			number_of_gaps = number_of_panes - 1;
-			number_of_new_materials = number_of_panes + number_of_gaps;
-
-			// Construction specific allocations
-			AWinSurf.allocate(number_of_panes, 1);
-			QRadSWwinAbs.allocate(number_of_panes, 1);
-			QRadSWwinAbsLayer.allocate(number_of_panes, 1);
-
-			// Create New Spectral Data objects
-			num_spectral_datasets = std::min(number_of_panes,2);
-			if ( new_spectraldata.size_ != (unsigned)num_spectral_datasets ) {
-				new_spectraldata.allocate(num_spectral_datasets);
-				SpectralData.allocate(num_spectral_datasets);
-				TotSpectralData = num_spectral_datasets;
-			}
-
-			SpectralData( 1 ).Name = construction_name + ":SPECTRALDATA1";
-			SpectralData( 1 ).NumOfWavelengths = spectral_data_size;
-
-			SpectralData( 1 ).WaveLength.deallocate( );
-			SpectralData( 1 ).Trans.deallocate( );
-			SpectralData( 1 ).ReflFront.deallocate( );
-			SpectralData( 1 ).ReflBack.deallocate( );
-
-			SpectralData( 1 ).WaveLength.allocate( spectral_data_size ); // Wavelength (microns)
-			SpectralData( 1 ).Trans.allocate( spectral_data_size ); // Transmittance at normal incidence
-			SpectralData( 1 ).ReflFront.allocate( spectral_data_size ); // Front reflectance at normal incidence
-			SpectralData( 1 ).ReflBack.allocate( spectral_data_size ); // Back reflectance at normal incidence
-
-			for ( int i = 1; i <= spectral_data_size; i++ ) {
-				SpectralData( 1 ).WaveLength( i ) = database.wavelengths[i-1]; // Wavelengths
-
-				// Construct spectral data from component properties
-				Real64 tau_s = substrateValue["tau_s"][i-1].asDouble();
-				tau_s = std::pow(tau_s,glass_thickness/substrateValue["Thickness"].asDouble());
-				Real64 r_s = substrateValue["r_s"][i-1].asDouble();
-				Real64 t_c, rf_c, rb_c;
-
-				if (glazing_coating != "NONE") {
-					t_c = coatingValue["t_c"][i-1].asDouble();
-					rf_c = coatingValue["rf_c"][i-1].asDouble();
-					rb_c = coatingValue["rb_c"][i-1].asDouble();
-				}
-				else {
-					t_c = 1 - r_s;
-					rf_c = r_s;
-					rb_c = r_s;
-				}
-
-				SpectralData( 1 ).Trans( i ) = ((1-r_s)*t_c*tau_s)/(1 - r_s*rf_c*tau_s*tau_s);
-				// Following is needed since angular calculation in subr TransAndReflAtPhi
-				// fails for Trans = 0.0
-				if ( SpectralData( 1 ).Trans( i ) < 0.001 ) {
-					SpectralData( 1 ).Trans( i ) = 0.001;
-				}
-				SpectralData( 1 ).ReflFront( i ) = r_s + (pow2(1 - r_s)*rf_c*tau_s*tau_s)/(1 - r_s*rf_c*tau_s*tau_s);
-				SpectralData( 1 ).ReflBack( i ) = rb_c + (t_c*t_c*r_s*tau_s*tau_s)/(1 - r_s*rf_c*tau_s*tau_s);
-			}
-
-			// Check integrity of the spectral data
-			for ( int LamNum = 1; LamNum <= spectral_data_size; ++LamNum ) {
-				Real64 Lam = SpectralData( 1 ).WaveLength( LamNum );
-				Real64 Tau = SpectralData( 1 ).Trans( LamNum );
-				Real64 RhoF = SpectralData( 1 ).ReflFront( LamNum );
-				Real64 RhoB = SpectralData( 1 ).ReflBack( LamNum );
-				if ( LamNum < spectral_data_size ) {
-					if ( SpectralData( 1 ).WaveLength( LamNum + 1 ) <= Lam ) {
-						ErrorsFound = true;
-						ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 1 ).Name + "\" invalid set." );
-						ShowContinueError( "... Wavelengths not in increasing order. at wavelength#=" + TrimSigDigits( LamNum ) + ", value=[" + TrimSigDigits( Lam, 4 ) + "], next is [" + TrimSigDigits( SpectralData( Loop ).WaveLength( LamNum + 1 ), 4 ) + "]." );
-					}
-				}
-
-				if ( Tau > 1.01 ) {
-					ErrorsFound = true;
-					ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 1 ).Name + "\" invalid value." );
-					ShowContinueError( "... A transmittance is > 1.0; at wavelength#=" + TrimSigDigits( LamNum ) + ", value=[" + TrimSigDigits( Tau, 4 ) + "]." );
-				}
-
-				if ( RhoF < 0.0 || RhoF > 1.02 || RhoB < 0.0 || RhoB > 1.02 ) {
-					ErrorsFound = true;
-					ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 1 ).Name + "\" invalid value." );
-					ShowContinueError( "... A reflectance is < 0.0 or > 1.0; at wavelength#=" + TrimSigDigits( LamNum ) + ", RhoF value=[" + TrimSigDigits( RhoF, 4 ) + "]." );
-					ShowContinueError( "... A reflectance is < 0.0 or > 1.0; at wavelength#=" + TrimSigDigits( LamNum ) + ", RhoB value=[" + TrimSigDigits( RhoB, 4 ) + "]." );
-				}
-
-				if ( ( Tau + RhoF ) > 1.03 || ( Tau + RhoB ) > 1.03 ) {
-					ErrorsFound = true;
-					ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 1 ).Name + "\" invalid value." );
-					ShowContinueError( "... Transmittance + reflectance) > 1.0 for an entry; at wavelength#=" + TrimSigDigits( LamNum ) + ", value(Tau+RhoF)=[" + TrimSigDigits( ( Tau + RhoF ), 4 ) + "], value(Tau+RhoB)=[" + TrimSigDigits( ( Tau + RhoB ), 4 ) + "]." );
-				}
-
-			}
-
-			if ( num_spectral_datasets == 2 ) {
-				SpectralData( 2 ).Name = construction_name + ":SPECTRALDATA2";
-				SpectralData( 2 ).NumOfWavelengths = spectral_data_size;
-
-				SpectralData( 2 ).WaveLength.deallocate( );
-				SpectralData( 2 ).Trans.deallocate( );
-				SpectralData( 2 ).ReflFront.deallocate( );
-				SpectralData( 2 ).ReflBack.deallocate( );
-
-				SpectralData( 2 ).WaveLength.allocate( spectral_data_size ); // Wavelength (microns)
-				SpectralData( 2 ).Trans.allocate( spectral_data_size ); // Transmittance at normal incidence
-				SpectralData( 2 ).ReflFront.allocate( spectral_data_size ); // Front reflectance at normal incidence
-				SpectralData( 2 ).ReflBack.allocate( spectral_data_size ); // Back reflectance at normal incidence
-
-				for ( int i = 1; i <= spectral_data_size; i++ ) {
-					SpectralData( 2 ).WaveLength( i ) = SpectralData( 1 ).WaveLength( i ); // Wavelengths
-
-					std::string innerSubstrate = "CLEAR";
-
-					if (glazing_substrate == "LOWIRON") {
-						innerSubstrate = "LOWIRON";
-					}
-
-					Json::Value innerSubstrateValue = database.getTraitValueByName("Substrates",innerSubstrate);
-
-					// Construct spectral data from component properties
-					Real64 tau_s = innerSubstrateValue["tau_s"][i-1].asDouble();
-					tau_s = std::pow(tau_s,glass_thickness/innerSubstrateValue["Thickness"].asDouble());
-					Real64 r_s = innerSubstrateValue["r_s"][i-1].asDouble();
-					Real64 t_c = 1 - r_s;
-					Real64 rf_c = r_s;
-					Real64 rb_c = r_s;
-
-					SpectralData( 2 ).Trans( i ) = ((1-r_s)*t_c*tau_s)/(1 - r_s*rf_c*tau_s*tau_s);
-					// Following is needed since angular calculation in subr TransAndReflAtPhi
-					// fails for Trans = 0.0
-					if ( SpectralData( 2 ).Trans( i ) < 0.001 ) {
-						SpectralData( 2 ).Trans( i ) = 0.001;
-					}
-					SpectralData( 2 ).ReflFront( i ) = r_s + (pow2(1 - r_s)*rf_c*tau_s*tau_s)/(1 - r_s*rf_c*tau_s*tau_s);
-					SpectralData( 2 ).ReflBack( i ) = rb_c + (t_c*t_c*r_s*tau_s*tau_s)/(1 - r_s*rf_c*tau_s*tau_s);
-				}
-
-				// Check integrity of the spectral data
-				for ( int LamNum = 1; LamNum <= spectral_data_size; ++LamNum ) {
-					Real64 Lam = SpectralData( 2 ).WaveLength( LamNum );
-					Real64 Tau = SpectralData( 2 ).Trans( LamNum );
-					Real64 RhoF = SpectralData( 2 ).ReflFront( LamNum );
-					Real64 RhoB = SpectralData( 2 ).ReflBack( LamNum );
-					if ( LamNum < spectral_data_size ) {
-						if ( SpectralData( 2 ).WaveLength( LamNum + 1 ) <= Lam ) {
-							ErrorsFound = true;
-							ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 2 ).Name + "\" invalid set." );
-							ShowContinueError( "... Wavelengths not in increasing order. at wavelength#=" + TrimSigDigits( LamNum ) + ", value=[" + TrimSigDigits( Lam, 4 ) + "], next is [" + TrimSigDigits( SpectralData( Loop ).WaveLength( LamNum + 1 ), 4 ) + "]." );
-						}
-					}
-
-					if ( Tau > 1.01 ) {
-						ErrorsFound = true;
-						ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 2 ).Name + "\" invalid value." );
-						ShowContinueError( "... A transmittance is > 1.0; at wavelength#=" + TrimSigDigits( LamNum ) + ", value=[" + TrimSigDigits( Tau, 4 ) + "]." );
-					}
-
-					if ( RhoF < 0.0 || RhoF > 1.02 || RhoB < 0.0 || RhoB > 1.02 ) {
-						ErrorsFound = true;
-						ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 2 ).Name + "\" invalid value." );
-						ShowContinueError( "... A reflectance is < 0.0 or > 1.0; at wavelength#=" + TrimSigDigits( LamNum ) + ", RhoF value=[" + TrimSigDigits( RhoF, 4 ) + "]." );
-						ShowContinueError( "... A reflectance is < 0.0 or > 1.0; at wavelength#=" + TrimSigDigits( LamNum ) + ", RhoB value=[" + TrimSigDigits( RhoB, 4 ) + "]." );
-					}
-
-					if ( ( Tau + RhoF ) > 1.03 || ( Tau + RhoB ) > 1.03 ) {
-						ErrorsFound = true;
-						ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 2 ).Name + "\" invalid value." );
-						ShowContinueError( "... Transmittance + reflectance) > 1.0 for an entry; at wavelength#=" + TrimSigDigits( LamNum ) + ", value(Tau+RhoF)=[" + TrimSigDigits( ( Tau + RhoF ), 4 ) + "], value(Tau+RhoB)=[" + TrimSigDigits( ( Tau + RhoB ), 4 ) + "]." );
-					}
-
-				}
-			}
-
-			// Create New Material objects
-			if ( new_materials.size_ != (unsigned)number_of_new_materials ) {
-				new_materials.allocate( number_of_new_materials );
-				Material.allocate( number_of_new_materials );
-				NominalR.allocate( number_of_new_materials );
-				TotMaterials = number_of_new_materials;
-			}
-
-
-			// Define material properties for glazings
-			for ( int MaterNum = 1; MaterNum <= number_of_new_materials; MaterNum += 2 )
-			{
-				std::string coating, substrate;
-				if (MaterNum == 1) {
-					coating = glazing_coating;
-					substrate = glazing_substrate;
-					Material( MaterNum ).GlassSpectralDataPtr = 1;
-				}
-				else {
-					coating = "NONE";
-					substrate = "CLEAR";
-					Material( MaterNum ).GlassSpectralDataPtr = 2;
-				}
-				Material( MaterNum ).Group = WindowGlass;
-				Material( MaterNum ).Name = construction_name + ":GLAZING" + std::to_string(MaterNum);
-				Material( MaterNum ).Roughness = VerySmooth;
-				Material( MaterNum ).ROnly = true;
-				Material( MaterNum ).Thickness = glass_thickness;
-				Material( MaterNum ).TransThermal = 0.0;
-				Material( MaterNum ).AbsorpThermalFront = coatingValue["Emissivity (Front)"].asDouble();
-				Material( MaterNum ).AbsorpThermalBack = coatingValue["Emissivity (Back)"].asDouble();
-				Material( MaterNum ).Conductivity = 1.0;
-				Material( MaterNum ).GlassTransDirtFactor = 1.0;	// Hold at unity to find match and then apply to outside layer
-				Material( MaterNum ).YoungModulus = 7.2e10;
-				Material( MaterNum ).PoissonsRatio = 0.22;
-				Material( MaterNum ).AbsorpThermal = Material( MaterNum ).AbsorpThermalBack;
-				Material( MaterNum ).SolarDiffusing = false;
-
-				NominalR( MaterNum ) = Material( MaterNum ).Thickness / Material( MaterNum ).Conductivity;
-				Material( MaterNum ).Resistance = NominalR( MaterNum );
-
-			}
-
-			int num_gases = gasValue.size();
-
-			// Define material properties for gaps
-			for ( int MaterNum = 2; MaterNum <= number_of_new_materials; MaterNum += 2 )
-			{
-				Material( MaterNum ).Group = WindowGasMixture;
-				Material( MaterNum ).Name = construction_name + ":GAP" + std::to_string(MaterNum);
-				Material( MaterNum ).Roughness = MediumRough;
-				Material( MaterNum ).ROnly = true;
-				Material( MaterNum ).Thickness = gap_thickness;
-				Material( MaterNum ).NumberOfGasesInMixture = num_gases;
-
-				for ( int gas = 1; gas <= num_gases; gas++)
-				{
-					Material( MaterNum ).GasType( gas ) = 0;
-					Material( MaterNum ).GasFract( gas ) = gasValue[gas-1]["Fraction"].asDouble();
-					Material( MaterNum ).GasWght( gas ) = gasValue[gas-1]["Molecular Weight"].asDouble();
-					Material( MaterNum ).GasSpecHeatRatio( gas ) = gasValue[gas-1]["Specific Heat Ratio"].asDouble();
-					for ( int ICoeff = 1; ICoeff <= 3; ++ICoeff ) {
-						Material( MaterNum ).GasCon( ICoeff, gas ) = gasValue[gas-1]["Conductivity"][ICoeff-1].asDouble();
-						Material( MaterNum ).GasVis( ICoeff, gas ) = gasValue[gas-1]["Viscosity"][ICoeff-1].asDouble();
-						Material( MaterNum ).GasCp( ICoeff, gas ) = gasValue[gas-1]["Specific Heat"][ICoeff-1].asDouble();
-					}
-				}
-
-				Real64 DenomRGas = ( Material( MaterNum ).GasCon( 1, 1 ) + Material( MaterNum ).GasCon( 1, 2 ) * 300.0 + Material( MaterNum ).GasCon( 1, 3 ) * 90000.0 );
-				NominalR( MaterNum ) = Material( MaterNum ).Thickness / DenomRGas;
-
-			}
-
-			new_construct.TotLayers = number_of_new_materials;
-
-			for ( int Layer = 1; Layer <= number_of_new_materials; ++Layer ) {
-				new_construct.LayerPoint( Layer ) = Layer;
-			}
-
-			Construct( 1 ) = new_construct;
-
-			NominalRforNominalUCalculation( 1 ) = 0.0;
-			for ( int Layer = 1; Layer <= Construct( 1 ).TotLayers; ++Layer ) {
-				NominalRforNominalUCalculation( 1 ) += NominalR( Construct( 1 ).LayerPoint( Layer ) );
-			}
-
-			CheckAndSetConstructionProperties( 1, ErrorsFound );
-
-			Surface( 1 ).Construction = 1; // This is the only construction available to the dummy surface. The actual surface will reference the real construction.
-			Surface( 1 ).FrameDivider = 0; // Set temporarily until after Center-of-Glass U-factor is calculated
-
-			// Set up U-factor conditions TODO read these from database
-			Real64 in_air_temp = u_indoor_temp;
-			Real64 out_air_temp = u_outdoor_temp;
-			Real64 wind_speed = u_wind_speed;
-			Real64 solar_incident = u_solar;
-
-			// Calculate Center-of-Glass U-factor (without Frame)
-			calc_window_performance(in_air_temp, out_air_temp, wind_speed, solar_incident);
-
-			u_cog = -WinHeatGain(1)/(Surface( 1 ).Area*(in_air_temp - out_air_temp));
-
-			if ( number_of_panes == 1)
-				u_eog = u_cog;
-			else {
-				Real64 eog_a = spacerTypeValue["Coefficients"][std::min(number_of_panes,3)-2][0].asDouble();
-				Real64 eog_b = spacerTypeValue["Coefficients"][std::min(number_of_panes,3)-2][1].asDouble();
-				Real64 eog_c = spacerTypeValue["Coefficients"][std::min(number_of_panes,3)-2][2].asDouble();
-				u_eog = eog_a + eog_b*u_cog + eog_c*pow_2(u_cog);
-			}
-
-			frame_edge_ratio = u_eog/u_cog;
-
-			// Set frame and divider properties
-			if ( has_frame )
-			{
-				new_frame_divider.Name = construction_name + ":FRAME";
-				new_frame_divider.FrameWidth = frame_width;
-				new_frame_divider.FrameProjectionOut = 0.0;
-				new_frame_divider.FrameProjectionIn = 0.0;
-				new_frame_divider.FrameConductance = frame_conductance;
-				new_frame_divider.FrEdgeToCenterGlCondRatio = frame_edge_ratio;
-				new_frame_divider.FrameSolAbsorp = frame_solar_absorptivity;
-				new_frame_divider.FrameVisAbsorp = frame_visible_absorptivity;
-				new_frame_divider.FrameEmis = frame_IR_emissivity;
-				new_frame_divider.FrameEdgeWidth = edge_width; // 2.5 in
-				new_frame_divider.DividerType = DividedLite;
-				new_frame_divider.DividerWidth = divider_width;
-				new_frame_divider.HorDividers = num_horizontal_dividers;
-				new_frame_divider.VertDividers = num_vertical_dividers;
-				new_frame_divider.DividerProjectionOut = 0.0;
-				new_frame_divider.DividerProjectionIn = 0.0;
-				new_frame_divider.DividerConductance = frame_conductance;
-				new_frame_divider.DivEdgeToCenterGlCondRatio = frame_edge_ratio;
-				new_frame_divider.DividerSolAbsorp = frame_solar_absorptivity;
-				new_frame_divider.DividerVisAbsorp = frame_visible_absorptivity;
-				new_frame_divider.DividerEmis = frame_IR_emissivity;
-				new_frame_divider.DividerEdgeWidth = edge_width; // 2.5 in
-
-				frame_area = fenestration_area - glazing_area;
-				SurfaceWindow( 1 ).FrameArea = frame_area;
-				SurfaceWindow( 1 ).DividerArea = divider_width*(num_horizontal_dividers*glazing_width + num_vertical_dividers*glazing_height - num_horizontal_dividers*num_vertical_dividers*divider_width);
-				Surface( 1 ).Area -= SurfaceWindow( 1 ).DividerArea;
-				SurfaceWindow( 1 ).GlazedFrac = Surface( 1 ).Area / ( Surface( 1 ).Area + SurfaceWindow( 1 ).DividerArea );
-
-				FrameDivider( 1 ) = new_frame_divider;
-
-				Surface( 1 ).FrameDivider = 1;
-			}
-
-			// Calculate total U-factor
-			calc_window_performance(in_air_temp, out_air_temp, wind_speed, solar_incident);
-
-			u_factor = -WinHeatGain(1)/(fenestration_area*(in_air_temp - out_air_temp));
-
-			// Set up SHGC conditions
-			in_air_temp = s_indoor_temp;
-			out_air_temp = s_outdoor_temp;
-			wind_speed = s_wind_speed;
-			solar_incident = s_solar;
-
-			// Calculate SHGC
-			calc_window_performance(in_air_temp, out_air_temp, wind_speed, solar_incident);
-
-			Real64 q_total = WinHeatGain(1);
-
-			// NFRC 201-2014 Equation 8-7
-			Real64 q_U = u_factor*fenestration_area*(out_air_temp - in_air_temp);
-
-			// NFRC 201-2014 Equation 8-2
-			shgc = (q_total - q_U)/(fenestration_area*solar_incident);
-
-			Real64 non_opaque_area_fraction = Surface( 1 ).Area/fenestration_area;
-			vt = POLYF(1.0,Construct( 1 ).TransVisBeamCoef( 1 ))*non_opaque_area_fraction;
-
-			// if match not obtained adjust inputs
-
-			// Deallocate construction specific arrays
-			AWinSurf.deallocate();
-			QRadSWwinAbs.deallocate();
-			QRadSWwinAbsLayer.deallocate();
-
-			if (!u_factor_set && !shgc_set) target_matched = true;
-
-			u_factor_diff = std::abs(target_u_factor - u_factor);
-			shgc_diff = std::abs(target_shgc - shgc);
-
-			if (u_factor_diff < u_factor_match_tolerance && shgc_diff < optical_match_tolerance)
-			{
-				target_matched = true;
-			}
-
-			// adjust properties
-			if (! target_matched)
-			{
-				target_matched = true; // TODO adjust properties
-			}
-
-		} // end matching loop
+		auto fs = FenestrationSystem(constructionName, database, uFactorTarget, shgcTarget, fenestrationTraits);
+		fs.calculate();
 
 		ASHRAE1588RP_Flag = false;
 		KickOffSimulation = true;
@@ -1021,140 +478,11 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		if ( ashrae1588_file_name != "" )
 		{
 			// Write to file
-			Json::Value output_1588;
 			Json::StyledStreamWriter writer;
-			output_1588["Metadata"]["Name"] = construction_name;
-			output_1588["Metadata"]["U-factor"] = u_factor;
-			output_1588["Metadata"]["Solar Heat Gain Coefficient"] = shgc;
-			output_1588["Metadata"]["Fenestration Type"] = fenestration_type;
-			output_1588["Metadata"]["Fenstration Area"] = fenestration_area;
-			output_1588["Metadata"]["Fenestration Width"] = fenestration_width;
-			output_1588["Metadata"]["Fenestration Height"] = fenestration_height;
-			output_1588["Metadata"]["1588-RP Matching"]["U-factor Target"] = target_u_factor;
-			output_1588["Metadata"]["1588-RP Matching"]["Solar Heat Gain Coefficient Target"] = target_shgc;
-			output_1588["Metadata"]["1588-RP Matching"]["U-factor Difference"] = u_factor_diff;
-			output_1588["Metadata"]["1588-RP Matching"]["Solar Heat Gain Coefficient Difference"] = shgc_diff;
-			output_1588["Metadata"]["Visible Transmittance"] = vt;
-			output_1588["Glazing"]["Number of Panes"] = number_of_panes;
-			output_1588["Glazing"]["Area"] = glazing_area;
-
-			// Since wavelengths are the same for each spectral dataset, they only need
-			// to appear once in the output file.
-			for ( int lam = 1; lam <= spectral_data_size; lam++) {
-				output_1588["Glazing"]["Wavelengths"][lam-1] = SpectralData( 1 ).WaveLength( lam );
-			}
-
-			for ( int MaterNum = 1; MaterNum <= number_of_new_materials; MaterNum += 2 ) {
-				int i = (MaterNum-1)/2;
-				output_1588["Glazing"]["Panes"][i]["Thickness"] = Material( MaterNum ).Thickness;
-				output_1588["Glazing"]["Panes"][i]["Conductivity"] = Material( MaterNum ).Conductivity;
-				if (i == 0) {
-					output_1588["Glazing"]["Panes"][i]["Coating"] = glazing_coating;
-					output_1588["Glazing"]["Panes"][i]["Substrate"] = glazing_substrate;
-				}
-				else {
-					output_1588["Glazing"]["Panes"][i]["Coating"] = "NONE";
-					output_1588["Glazing"]["Panes"][i]["Substrate"] = "CLEAR";
-				}
-				output_1588["Glazing"]["Panes"][i]["Average Infrared Transmittance"] = Material( MaterNum ).TransThermal;
-				output_1588["Glazing"]["Panes"][i]["Average Infrared Back Side Absorptance"] = Material( MaterNum ).AbsorpThermalBack;
-				output_1588["Glazing"]["Panes"][i]["Average Infrared Front Side Absorptance"] = Material( MaterNum ).AbsorpThermalFront;
-
-				int spectral_data_index = Material( MaterNum ).GlassSpectralDataPtr;
-
-				Real64 TransSolUp = 0.0,
-							 TransVisUp = 0.0,
-							 RefFrontSolUp = 0.0,
-							 RefFrontVisUp = 0.0,
-							 RefBackSolUp = 0.0,
-							 RefBackVisUp = 0.0,
-							 SolDown = 0.0,
-							 VisDown = 0.0;
-
-				for ( int lam = 1; lam <= spectral_data_size; lam++) {
-					Real64 Trans = SpectralData(spectral_data_index).Trans( lam );
-					Real64 RefFront = SpectralData(spectral_data_index).ReflFront( lam );
-					Real64 RefBack = SpectralData(spectral_data_index).ReflBack( lam );
-					output_1588["Glazing"]["Panes"][i]["Transmittance"][lam-1] = Trans;
-					output_1588["Glazing"]["Panes"][i]["Reflectance (Front)"][lam-1] = RefFront;
-					output_1588["Glazing"]["Panes"][i]["Reflectance (Back)"][lam-1] = RefBack;
-
-					// Numeric integration of average properties. Follows same method as WindowManager, but uses consistent wavelengths.
-					if (lam != spectral_data_size) {
-						// Spectral Properties
-						Real64 TransNext = SpectralData(spectral_data_index).Trans( lam + 1 );
-						Real64 RefFrontNext = SpectralData(spectral_data_index).ReflFront( lam + 1 );
-						Real64 RefBackNext = SpectralData(spectral_data_index).ReflBack( lam + 1);
-
-						// Wavelengths
-						Real64 Wl = SpectralData(spectral_data_index).WaveLength( lam );
-						Real64 WlNext = SpectralData(spectral_data_index).WaveLength( lam + 1 );
-
-						// Solar Spectrum and Photopic Response
-						Real64 SS = database.solarSpectrum[lam - 1];
-						Real64 SSNext = database.solarSpectrum[lam];
-
-						Real64 PR = database.photopicResponse[lam - 1];
-						Real64 PRNext = database.photopicResponse[lam];
-
-						Real64 eSol = (WlNext - Wl)*0.5*(SS + SSNext);
-						Real64 eVis = (WlNext - Wl)*0.5*(SS + SSNext)*0.5*(PR + PRNext);
-
-						TransSolUp += eSol*0.5*(Trans + TransNext);
-						RefFrontSolUp += eSol*0.5*(RefFront + RefFrontNext);
-						RefBackSolUp += eSol*0.5*(RefBack + RefBackNext);
-
-						TransVisUp += eVis*0.5*(Trans + TransNext);
-						RefFrontVisUp += eVis*0.5*(RefFront + RefFrontNext);
-						RefBackVisUp += eVis*0.5*(RefBack + RefBackNext);
-
-						SolDown += eSol;
-						VisDown += eVis;
-
-					}
-
-				}
-
-				output_1588["Glazing"]["Panes"][i]["Average Solar Transmittance"] = TransSolUp/SolDown;
-				output_1588["Glazing"]["Panes"][i]["Average Solar Front Side Reflectance"] = RefFrontSolUp/SolDown;
-				output_1588["Glazing"]["Panes"][i]["Average Solar Back Side Reflectance"] = RefBackSolUp/SolDown;
-				output_1588["Glazing"]["Panes"][i]["Average Visible Transmittance"] = TransVisUp/VisDown;
-				output_1588["Glazing"]["Panes"][i]["Average Visible Front Side Reflectance"] = RefFrontVisUp/VisDown;
-				output_1588["Glazing"]["Panes"][i]["Average Visible Back Side Reflectance"] = RefBackVisUp/VisDown;
-			}
-
-			for ( int MaterNum = 2; MaterNum <= number_of_new_materials; MaterNum += 2 ) {
-				int i = (MaterNum-2)/2;
-				output_1588["Glazing"]["Gaps"][i]["Primary Gas"] = gas_type;
-				output_1588["Glazing"]["Gaps"][i]["Thickness"] = Material( MaterNum ).Thickness;
-				for (int gas = 1; gas <= Material( MaterNum ).NumberOfGasesInMixture; gas++) {
-					output_1588["Glazing"]["Gaps"][i]["Mixture"][gas-1]["Gas"] = gasValue[gas-1]["Gas"];
-					output_1588["Glazing"]["Gaps"][i]["Mixture"][gas-1]["Fraction"] = Material( MaterNum ).GasFract( gas );
-					output_1588["Glazing"]["Gaps"][i]["Mixture"][gas-1]["Molecular Weight"] = Material( MaterNum ).GasWght( gas );
-					output_1588["Glazing"]["Gaps"][i]["Mixture"][gas-1]["Specific Heat Ratio"] = Material( MaterNum ).GasSpecHeatRatio( gas );
-					for ( int ICoeff = 1; ICoeff <= 3; ++ICoeff ) {
-						output_1588["Glazing"]["Gaps"][i]["Mixture"][gas-1]["Conductivity"][ICoeff-1] = Material( MaterNum ).GasCon( gas, ICoeff );
-						output_1588["Glazing"]["Gaps"][i]["Mixture"][gas-1]["Viscosity"][ICoeff-1] = Material( MaterNum ).GasVis( gas, ICoeff );
-						output_1588["Glazing"]["Gaps"][i]["Mixture"][gas-1]["Specific Heat"][ICoeff-1] = Material( MaterNum ).GasCp( gas, ICoeff );
-					}
-				}
-			}
-
-			output_1588["Glazing"]["Center-of-Glass U-factor"] = u_cog;
-			output_1588["Frame and Divider"]["Frame Width"] = frame_width;
-			output_1588["Frame and Divider"]["Frame Conductance"] = frame_conductance;
-			output_1588["Frame and Divider"]["Frame Material"] = frame_material;
-			output_1588["Frame and Divider"]["Spacer Type"] = spacer_type;
-			output_1588["Frame and Divider"]["Edge-of-Glass U-factor"] = u_eog;
-			output_1588["Frame and Divider"]["Edge-of-Glass Conductance Ratio"] = frame_edge_ratio;
-			output_1588["Frame and Divider"]["Frame Area"] = frame_area;
-			output_1588["Frame and Divider"]["Divider Width"] = divider_width;
-			output_1588["Frame and Divider"]["Number of Vertical Dividers"] = num_vertical_dividers;
-			output_1588["Frame and Divider"]["Number of Horizontal Dividers"] = num_horizontal_dividers;
 
 			std::ofstream output_file(ashrae1588_file_name);
 
-			writer.write(output_file, output_1588);
+			writer.write(output_file, fs.generateOutput());
 			output_file.close();
 		}
 
@@ -1163,62 +491,63 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 
 		// Restore Spectral Data list and copy in new spectral data
 		{
-			new_spectraldata = SpectralData;
+			Array1D< SpectralDataProperties > newSpectralData = SpectralData;
+			int numSpectralDatasets = SpectralData.size_;
 			SpectralData.deallocate();
 			TotSpectralData = TotSpectralDataSave;
-			SpectralData.allocate( TotSpectralData + num_spectral_datasets );
+			SpectralData.allocate( TotSpectralData + numSpectralDatasets );
 			SpectralData( {1,TotSpectralData} ) = SpectralDataSave;
-			SpectralData( {TotSpectralData + 1, TotSpectralData + num_spectral_datasets}) = new_spectraldata;
+			SpectralData( {TotSpectralData + 1, TotSpectralData + numSpectralDatasets}) = newSpectralData;
 
 			SpectralDataSave.deallocate();
 
-			TotSpectralData += num_spectral_datasets;
+			TotSpectralData += numSpectralDatasets;
 		}
 
 		// Restore materials list and copy in new materials
-		{
-			// Apply dirt factor to outermost layer
-			if (dirt_factor == 0.0) // Don't know why this is done, but it happens for all window constructions
-				Material[0].GlassTransDirtFactor = 1.0;
-			else
-				Material[0].GlassTransDirtFactor = dirt_factor;
+		// Apply dirt factor to outermost layer
+		if (dirt_factor == 0.0) // Don't know why this is done, but it happens for all window constructions
+			Material[0].GlassTransDirtFactor = 1.0;
+		else
+			Material[0].GlassTransDirtFactor = dirt_factor;
 
-			for (int i = 1; i <= (int)Material.size_; i++) {
-				if ( Material( i ).Group == WindowGlass ) {
-					Material( i ).GlassSpectralDataPtr += TotSpectralDataSave;
-				}
+		for (int i = 1; i <= (int)Material.size_; i++) {
+			if ( Material( i ).Group == WindowGlass ) {
+				Material( i ).GlassSpectralDataPtr += TotSpectralDataSave;
 			}
-
-
-			new_materials = Material;
-			new_nominal_R = NominalR;
-
-			Material.deallocate();
-			NominalR.deallocate();
-
-			TotMaterials = TotMaterialsSave;
-
-			Material.allocate( TotMaterials + number_of_new_materials);
-			NominalR.allocate( TotMaterials + number_of_new_materials);
-			Material( {1,TotMaterials} ) = MaterialSave( {1,TotMaterials} );
-			NominalR( {1,TotMaterials} ) = NominalRSave( {1,TotMaterials} );
-			Material( {TotMaterials + 1, TotMaterials + number_of_new_materials} ) = new_materials;
-			NominalR( {TotMaterials + 1, TotMaterials + number_of_new_materials} ) = new_nominal_R;
-
-			MaterialSave.deallocate();
-			NominalRSave.deallocate();
 		}
 
-		// Restore frame and divider list and copy in new frame and divider
-		FrameDivider.deallocate();
 
+		Array1D< MaterialProperties > newMaterials = Material;
+		Array1D< Real64 > newNominalR = NominalR;
+		int numberOfNewMaterials = Material.size_;
+
+		Material.deallocate();
+		NominalR.deallocate();
+
+		TotMaterials = TotMaterialsSave;
+
+		Material.allocate( TotMaterials + numberOfNewMaterials);
+		NominalR.allocate( TotMaterials + numberOfNewMaterials);
+		Material( {1,TotMaterials} ) = MaterialSave( {1,TotMaterials} );
+		NominalR( {1,TotMaterials} ) = NominalRSave( {1,TotMaterials} );
+		Material( {TotMaterials + 1, TotMaterials + numberOfNewMaterials} ) = newMaterials;
+		NominalR( {TotMaterials + 1, TotMaterials + numberOfNewMaterials} ) = newNominalR;
+
+		MaterialSave.deallocate();
+		NominalRSave.deallocate();
+
+		// Restore frame and divider list and copy in new frame and divider
 		TotFrameDivider = TotFrameDividerSave;
 
-		if ( has_frame )
+		bool hasFrame = (FrameDivider.size_ > 0);
+
+		if ( hasFrame )
 		{
+			FrameDividerProperties newFrameDivider = FrameDivider( 1 );
 			FrameDivider.allocate( TotFrameDivider + 1 );
 			FrameDivider( {1,TotFrameDivider} ) = FrameDividerSave;
-			FrameDivider( TotFrameDivider + 1 ) = new_frame_divider;
+			FrameDivider( TotFrameDivider + 1 ) = newFrameDivider;
 			TotFrameDivider += 1;
 		}
 		else
@@ -1234,6 +563,7 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		{
 			Real64 newU = NominalU( 1 );
 			Real64 newR = NominalRforNominalUCalculation( 1 );
+			ConstructionData new_construct = Construct( 1 );
 
 			Construct.deallocate();
 			NominalRforNominalUCalculation.deallocate();
@@ -1255,9 +585,9 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 				Construct( ConstrNum ).LayerPoint( Layer ) = TotMaterials + Layer;
 			}
 
-			TotMaterials += number_of_new_materials;
+			TotMaterials += numberOfNewMaterials;
 
-			if ( has_frame )
+			if ( hasFrame )
 			{
 				Construct( ConstrNum ).W5FrameDivider = TotFrameDivider;
 			}
@@ -1273,9 +603,8 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 
 	} // ...end of WindowASHRAE1588RP Constructions DO loop
 
-	if ( stand_alone_analysis )
+	if ( standAloneAnalysis )
 	{
-		std::cout << std::endl;
 
 		// Write to console
 		std::string Elapsed;
@@ -1321,10 +650,10 @@ Json::Value read_1588_database(std::string file_path)
 	return root;
 }
 
-void search_database_keys_for_input(const std::string &construction_name, const std::string &field_name, const std::vector< std::string > &keys, const std::string &input, bool &ErrorsFound)
+void search_database_keys_for_input(const std::string &constructionName, const std::string &field_name, const std::vector< std::string > &keys, const std::string &input, bool &ErrorsFound)
 {
 	if (!(std::find(keys.begin(), keys.end(), input) != keys.end())) {
-		std::string message = "Construction:WindowASHRAE1588RP=" + construction_name + ", " + field_name + "=" + input + " not found in 1588 database.";
+		std::string message = "Construction:WindowASHRAE1588RP=" + constructionName + ", " + field_name + "=" + input + " not found in 1588 database.";
 		ErrorsFound = true;
 		ShowSevereError( message );
 	}
@@ -1400,6 +729,637 @@ void calc_window_performance(Real64 T_in, Real64 T_out, Real64 v_ws, Real64 I_s)
 
 	}
 
+}
+
+FenestrationSystem::FenestrationSystem(
+	const std::string &constructionName,
+	const ASHRAE1588Database &db,
+	const Real64 &uFactorTarget,
+	const Real64 &shgcTarget,
+	std::vector <Real64> fenestrationTraits)
+	: database(db),
+	constructionName(constructionName),
+	uFactorTarget(uFactorTarget),
+	shgcTarget(shgcTarget)
+{
+	fenestrationTypeIndex = int(fenestrationTraits[0]);
+	numberOfPanesIndex = int(fenestrationTraits[1]);
+	glazingThickness = fenestrationTraits[2];
+	glazingSubstrateIndex = int(fenestrationTraits[3]);
+	glazingCoatingIndex = int(fenestrationTraits[4]);
+	gasTypeIndex = int(fenestrationTraits[5]);
+	gapThickness = fenestrationTraits[6];
+	spacerTypeIndex = int(fenestrationTraits[7]);
+	frameTypeIndex = int(fenestrationTraits[8]);
+	frameWidth = fenestrationTraits[9];
+	dividerWidth = fenestrationTraits[10];
+
+	fenestrationType = database.getTraitNameByIndex("Types",fenestrationTypeIndex);
+	numberOfPanes = database.getTraitValueByIndex("Panes",numberOfPanesIndex).asInt();
+	glazingSubstrateType = database.getTraitNameByIndex("Substrates",glazingSubstrateIndex);
+	glazingCoatingType = database.getTraitNameByIndex("Coatings",glazingCoatingIndex);
+	gasType = database.getTraitNameByIndex("Gases",gasTypeIndex);
+	spacerType = database.getTraitNameByIndex("Spacers",spacerTypeIndex);
+	frameType = database.getTraitNameByIndex("Frames",frameTypeIndex);
+
+
+}
+
+
+void
+FenestrationSystem::calculate() {
+
+	bool ErrorsFound = false;
+	int spectralDataSize = database.wavelengths.size();
+
+	// Set testing conditions
+	Real64 u_indoor_temp = database.tests["U-factor"]["Indoor Temperature"].asDouble();
+	Real64 u_outdoor_temp = database.tests["U-factor"]["Outdoor Temperature"].asDouble();
+	Real64 u_wind_speed = database.tests["U-factor"]["Wind Speed"].asDouble();
+	Real64 u_solar = database.tests["U-factor"]["Solar Incidence"].asDouble();
+
+	Real64 s_indoor_temp = database.tests["SHGC"]["Indoor Temperature"].asDouble();
+	Real64 s_outdoor_temp = database.tests["SHGC"]["Outdoor Temperature"].asDouble();
+	Real64 s_wind_speed = database.tests["SHGC"]["Wind Speed"].asDouble();
+	Real64 s_solar = database.tests["SHGC"]["Solar Incidence"].asDouble();
+
+	Json::Value fenestrationTypeValue = database.getTraitValueByIndex("Types",fenestrationTypeIndex);
+	Json::Value substrateValue = database.getTraitValueByIndex("Substrates",glazingSubstrateIndex);
+	Json::Value coatingValue = database.getTraitValueByIndex("Coatings",glazingCoatingIndex);
+	Json::Value gasValue = database.getTraitValueByIndex("Gases",gasTypeIndex);
+	Json::Value spacerTypeValue = database.getTraitValueByIndex("Spacers",spacerTypeIndex);
+	Json::Value frameMaterialValue = database.getTraitValueByIndex("Frames",frameTypeIndex);
+
+	Real64 frameSolarAbsorptivity = fenestrationTypeValue["Frame Absorptivity"].asDouble();
+	Real64 frameVisibleAbsorptivity = fenestrationTypeValue["Frame Absorptivity"].asDouble();
+
+	Real64 frameUFactor;
+	std::string fenestrationCategory = fenestrationTypeValue["Category"].asString();
+	if ( spacerTypeValue["Metal"].asBool() ) {
+		frameUFactor = frameMaterialValue["Metal Spacer"][fenestrationCategory][std::min(numberOfPanes,3)-1].asDouble();
+	}
+	else {
+		frameUFactor = frameMaterialValue["Non-Metal Spacer"][fenestrationCategory][std::min(numberOfPanes,3)-1].asDouble();
+	}
+
+	Real64 assumed_h_o = 30;	// W/m2-K
+	Real64 assumed_h_i = 8;	// W/m2-K
+
+	if ( (1/assumed_h_o + 1/assumed_h_i) >= (1/frameUFactor) ) {
+		frameConductance = 9999999;
+	}
+	else {
+		frameConductance = 1/(1/frameUFactor - (1/assumed_h_o + 1/assumed_h_i));
+	}
+
+	fenestrationWidth = fenestrationTypeValue["Width"].asDouble();
+	fenestrationHeight = fenestrationTypeValue["Height"].asDouble();
+	Real64 tilt = fenestrationTypeValue["Tilt"].asDouble()*Pi/180.0;
+
+	bool hasFrame;
+
+	if ( frameWidth > 0.0 )
+	{
+		hasFrame = true;
+	}
+	else
+	{
+		hasFrame = false;
+	}
+
+	fenestrationArea = fenestrationWidth*fenestrationHeight;
+	Real64 glazingWidth = fenestrationWidth - 2.0*frameWidth;
+	Real64 glazingHeight = fenestrationHeight - 2.0*frameWidth;
+	glazingArea = glazingWidth*glazingHeight;
+
+	Real64 maxDividerSpacing = 0.3; // NFRC 100-2014 4.2.2 (B)
+	Real64 frame_IR_emissivity = 0.9;
+	Real64 edge_width = 0.06355;
+
+	if ( hasFrame && dividerWidth > 0.0)
+	{
+		numHorizontalDividers = ceil(glazingHeight/maxDividerSpacing);
+		numVerticalDividers = ceil(glazingWidth/maxDividerSpacing);
+	}
+	else
+	{
+		numHorizontalDividers = 0;
+		numVerticalDividers = 0;
+	}
+
+	Surface( 1 ).Height = glazingHeight;
+	Surface( 1 ).Width = glazingWidth;
+	Surface( 1 ).Area = glazingArea;
+	Surface( 1 ).Tilt = tilt*180/Pi;
+	Surface( 1 ).CosTilt = cos(tilt);
+	Surface( 1 ).SinTilt = sin(tilt);
+	Surface( 1 ).ViewFactorSky = 0.5 * ( 1.0 + Surface( 1 ).CosTilt );
+	Surface( 1 ).ViewFactorGround = 0.5 * ( 1.0 - Surface( 1 ).CosTilt );
+	Surface( 1 ).ViewFactorSkyIR = Surface( 1 ).ViewFactorSky;
+	Surface( 1 ).ViewFactorGroundIR = Surface( 1 ).ViewFactorGround;
+	AirSkyRadSplit( 1 ) = std::sqrt( 0.5 * ( 1.0 + Surface( 1 ).CosTilt ) );
+
+	int numberOfGaps = numberOfPanes - 1;
+	int numberOfNewMaterials = numberOfPanes + numberOfGaps;
+
+	// Construction specific allocations
+	AWinSurf.allocate(numberOfPanes, 1);
+	QRadSWwinAbs.allocate(numberOfPanes, 1);
+	QRadSWwinAbsLayer.allocate(numberOfPanes, 1);
+
+	// Create New Spectral Data objects
+	int numSpectralDatasets = std::min(numberOfPanes,2);
+	if ( SpectralData.size_ != (unsigned)numSpectralDatasets ) {
+		SpectralData.allocate(numSpectralDatasets);
+		TotSpectralData = numSpectralDatasets;
+	}
+
+	SpectralData( 1 ).Name = constructionName + ":SPECTRALDATA1";
+	SpectralData( 1 ).NumOfWavelengths = spectralDataSize;
+
+	SpectralData( 1 ).WaveLength.deallocate( );
+	SpectralData( 1 ).Trans.deallocate( );
+	SpectralData( 1 ).ReflFront.deallocate( );
+	SpectralData( 1 ).ReflBack.deallocate( );
+
+	SpectralData( 1 ).WaveLength.allocate( spectralDataSize ); // Wavelength (microns)
+	SpectralData( 1 ).Trans.allocate( spectralDataSize ); // Transmittance at normal incidence
+	SpectralData( 1 ).ReflFront.allocate( spectralDataSize ); // Front reflectance at normal incidence
+	SpectralData( 1 ).ReflBack.allocate( spectralDataSize ); // Back reflectance at normal incidence
+
+	for ( int i = 1; i <= spectralDataSize; i++ ) {
+		SpectralData( 1 ).WaveLength( i ) = database.wavelengths[i-1]; // Wavelengths
+
+		// Construct spectral data from component properties
+		Real64 tau_s = substrateValue["tau_s"][i-1].asDouble();
+		tau_s = std::pow(tau_s,glazingThickness/substrateValue["Thickness"].asDouble());
+		Real64 r_s = substrateValue["r_s"][i-1].asDouble();
+		Real64 t_c, rf_c, rb_c;
+
+		if (database.getTraitNameByIndex("Coatings",glazingCoatingIndex) != "NONE") {
+			t_c = coatingValue["t_c"][i-1].asDouble();
+			rf_c = coatingValue["rf_c"][i-1].asDouble();
+			rb_c = coatingValue["rb_c"][i-1].asDouble();
+		}
+		else {
+			t_c = 1 - r_s;
+			rf_c = r_s;
+			rb_c = r_s;
+		}
+
+		SpectralData( 1 ).Trans( i ) = ((1-r_s)*t_c*tau_s)/(1 - r_s*rf_c*tau_s*tau_s);
+		// Following is needed since angular calculation in subr TransAndReflAtPhi
+		// fails for Trans = 0.0
+		if ( SpectralData( 1 ).Trans( i ) < 0.001 ) {
+			SpectralData( 1 ).Trans( i ) = 0.001;
+		}
+		SpectralData( 1 ).ReflFront( i ) = r_s + (pow_2(1 - r_s)*rf_c*tau_s*tau_s)/(1 - r_s*rf_c*tau_s*tau_s);
+		SpectralData( 1 ).ReflBack( i ) = rb_c + (t_c*t_c*r_s*tau_s*tau_s)/(1 - r_s*rf_c*tau_s*tau_s);
+	}
+
+	std::string RoutineName = "WindowASHRAE1588RP";
+
+	// Check integrity of the spectral data
+	for ( int LamNum = 1; LamNum <= spectralDataSize; ++LamNum ) {
+		Real64 Lam = SpectralData( 1 ).WaveLength( LamNum );
+		Real64 Tau = SpectralData( 1 ).Trans( LamNum );
+		Real64 RhoF = SpectralData( 1 ).ReflFront( LamNum );
+		Real64 RhoB = SpectralData( 1 ).ReflBack( LamNum );
+		if ( LamNum < spectralDataSize ) {
+			if ( SpectralData( 1 ).WaveLength( LamNum + 1 ) <= Lam ) {
+				ErrorsFound = true;
+				ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 1 ).Name + "\" invalid set." );
+				ShowContinueError( "... Wavelengths not in increasing order. at wavelength#=" + TrimSigDigits( LamNum ) + ", value=[" + TrimSigDigits( Lam, 4 ) + "], next is [" + TrimSigDigits( SpectralData( 1 ).WaveLength( LamNum + 1 ), 4 ) + "]." );
+			}
+		}
+
+		if ( Tau > 1.01 ) {
+			ErrorsFound = true;
+			ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 1 ).Name + "\" invalid value." );
+			ShowContinueError( "... A transmittance is > 1.0; at wavelength#=" + TrimSigDigits( LamNum ) + ", value=[" + TrimSigDigits( Tau, 4 ) + "]." );
+		}
+
+		if ( RhoF < 0.0 || RhoF > 1.02 || RhoB < 0.0 || RhoB > 1.02 ) {
+			ErrorsFound = true;
+			ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 1 ).Name + "\" invalid value." );
+			ShowContinueError( "... A reflectance is < 0.0 or > 1.0; at wavelength#=" + TrimSigDigits( LamNum ) + ", RhoF value=[" + TrimSigDigits( RhoF, 4 ) + "]." );
+			ShowContinueError( "... A reflectance is < 0.0 or > 1.0; at wavelength#=" + TrimSigDigits( LamNum ) + ", RhoB value=[" + TrimSigDigits( RhoB, 4 ) + "]." );
+		}
+
+		if ( ( Tau + RhoF ) > 1.03 || ( Tau + RhoB ) > 1.03 ) {
+			ErrorsFound = true;
+			ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 1 ).Name + "\" invalid value." );
+			ShowContinueError( "... Transmittance + reflectance) > 1.0 for an entry; at wavelength#=" + TrimSigDigits( LamNum ) + ", value(Tau+RhoF)=[" + TrimSigDigits( ( Tau + RhoF ), 4 ) + "], value(Tau+RhoB)=[" + TrimSigDigits( ( Tau + RhoB ), 4 ) + "]." );
+		}
+
+	}
+
+	if ( numSpectralDatasets == 2 ) {
+		SpectralData( 2 ).Name = constructionName + ":SPECTRALDATA2";
+		SpectralData( 2 ).NumOfWavelengths = spectralDataSize;
+
+		SpectralData( 2 ).WaveLength.deallocate( );
+		SpectralData( 2 ).Trans.deallocate( );
+		SpectralData( 2 ).ReflFront.deallocate( );
+		SpectralData( 2 ).ReflBack.deallocate( );
+
+		SpectralData( 2 ).WaveLength.allocate( spectralDataSize ); // Wavelength (microns)
+		SpectralData( 2 ).Trans.allocate( spectralDataSize ); // Transmittance at normal incidence
+		SpectralData( 2 ).ReflFront.allocate( spectralDataSize ); // Front reflectance at normal incidence
+		SpectralData( 2 ).ReflBack.allocate( spectralDataSize ); // Back reflectance at normal incidence
+
+		for ( int i = 1; i <= spectralDataSize; i++ ) {
+			SpectralData( 2 ).WaveLength( i ) = SpectralData( 1 ).WaveLength( i ); // Wavelengths
+
+			std::string innerSubstrate = "CLEAR";
+
+			if (database.getTraitNameByIndex("Substrate",glazingSubstrateIndex) == "LOWIRON") {
+				innerSubstrate = "LOWIRON";
+			}
+
+			Json::Value innerSubstrateValue = database.getTraitValueByName("Substrates",innerSubstrate);
+
+			// Construct spectral data from component properties
+			Real64 tau_s = innerSubstrateValue["tau_s"][i-1].asDouble();
+			tau_s = std::pow(tau_s,glazingThickness/innerSubstrateValue["Thickness"].asDouble());
+			Real64 r_s = innerSubstrateValue["r_s"][i-1].asDouble();
+			Real64 t_c = 1 - r_s;
+			Real64 rf_c = r_s;
+			Real64 rb_c = r_s;
+
+			SpectralData( 2 ).Trans( i ) = ((1-r_s)*t_c*tau_s)/(1 - r_s*rf_c*tau_s*tau_s);
+			// Following is needed since angular calculation in subr TransAndReflAtPhi
+			// fails for Trans = 0.0
+			if ( SpectralData( 2 ).Trans( i ) < 0.001 ) {
+				SpectralData( 2 ).Trans( i ) = 0.001;
+			}
+			SpectralData( 2 ).ReflFront( i ) = r_s + (pow_2(1 - r_s)*rf_c*tau_s*tau_s)/(1 - r_s*rf_c*tau_s*tau_s);
+			SpectralData( 2 ).ReflBack( i ) = rb_c + (t_c*t_c*r_s*tau_s*tau_s)/(1 - r_s*rf_c*tau_s*tau_s);
+		}
+
+		// Check integrity of the spectral data
+		for ( int LamNum = 1; LamNum <= spectralDataSize; ++LamNum ) {
+			Real64 Lam = SpectralData( 2 ).WaveLength( LamNum );
+			Real64 Tau = SpectralData( 2 ).Trans( LamNum );
+			Real64 RhoF = SpectralData( 2 ).ReflFront( LamNum );
+			Real64 RhoB = SpectralData( 2 ).ReflBack( LamNum );
+			if ( LamNum < spectralDataSize ) {
+				if ( SpectralData( 2 ).WaveLength( LamNum + 1 ) <= Lam ) {
+					ErrorsFound = true;
+					ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 2 ).Name + "\" invalid set." );
+					ShowContinueError( "... Wavelengths not in increasing order. at wavelength#=" + TrimSigDigits( LamNum ) + ", value=[" + TrimSigDigits( Lam, 4 ) + "], next is [" + TrimSigDigits( SpectralData( 2 ).WaveLength( LamNum + 1 ), 4 ) + "]." );
+				}
+			}
+
+			if ( Tau > 1.01 ) {
+				ErrorsFound = true;
+				ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 2 ).Name + "\" invalid value." );
+				ShowContinueError( "... A transmittance is > 1.0; at wavelength#=" + TrimSigDigits( LamNum ) + ", value=[" + TrimSigDigits( Tau, 4 ) + "]." );
+			}
+
+			if ( RhoF < 0.0 || RhoF > 1.02 || RhoB < 0.0 || RhoB > 1.02 ) {
+				ErrorsFound = true;
+				ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 2 ).Name + "\" invalid value." );
+				ShowContinueError( "... A reflectance is < 0.0 or > 1.0; at wavelength#=" + TrimSigDigits( LamNum ) + ", RhoF value=[" + TrimSigDigits( RhoF, 4 ) + "]." );
+				ShowContinueError( "... A reflectance is < 0.0 or > 1.0; at wavelength#=" + TrimSigDigits( LamNum ) + ", RhoB value=[" + TrimSigDigits( RhoB, 4 ) + "]." );
+			}
+
+			if ( ( Tau + RhoF ) > 1.03 || ( Tau + RhoB ) > 1.03 ) {
+				ErrorsFound = true;
+				ShowSevereError( RoutineName + CurrentModuleObject + "=\"" + SpectralData( 2 ).Name + "\" invalid value." );
+				ShowContinueError( "... Transmittance + reflectance) > 1.0 for an entry; at wavelength#=" + TrimSigDigits( LamNum ) + ", value(Tau+RhoF)=[" + TrimSigDigits( ( Tau + RhoF ), 4 ) + "], value(Tau+RhoB)=[" + TrimSigDigits( ( Tau + RhoB ), 4 ) + "]." );
+			}
+
+		}
+	}
+
+	// Create New Material objects
+	if ( Material.size_ != (unsigned)numberOfNewMaterials ) {
+		Material.allocate( numberOfNewMaterials );
+		NominalR.allocate( numberOfNewMaterials );
+		TotMaterials = numberOfNewMaterials;
+	}
+
+
+	// Define material properties for glazings
+	for ( int MaterNum = 1; MaterNum <= numberOfNewMaterials; MaterNum += 2 )
+	{
+		std::string coating, substrate;
+		if (MaterNum == 1) {
+			coating = database.getTraitNameByIndex("Coatings",glazingCoatingIndex);
+			Material( MaterNum ).GlassSpectralDataPtr = 1;
+		}
+		else {
+			coating = "NONE";
+			Material( MaterNum ).GlassSpectralDataPtr = 2;
+		}
+
+		Json::Value paneCoatingValue = database.getTraitValueByName("Coatings",coating);
+
+		Material( MaterNum ).Group = WindowGlass;
+		Material( MaterNum ).Name = constructionName + ":GLAZING" + std::to_string(MaterNum);
+		Material( MaterNum ).Roughness = VerySmooth;
+		Material( MaterNum ).ROnly = true;
+		Material( MaterNum ).Thickness = glazingThickness;
+		Material( MaterNum ).TransThermal = 0.0;
+		Material( MaterNum ).AbsorpThermalFront = paneCoatingValue["Emissivity (Front)"].asDouble();
+		Material( MaterNum ).AbsorpThermalBack = paneCoatingValue["Emissivity (Back)"].asDouble();
+		Material( MaterNum ).Conductivity = 1.0;
+		Material( MaterNum ).GlassTransDirtFactor = 1.0;	// Hold at unity to find match and then apply to outside layer
+		Material( MaterNum ).YoungModulus = 7.2e10;
+		Material( MaterNum ).PoissonsRatio = 0.22;
+		Material( MaterNum ).AbsorpThermal = Material( MaterNum ).AbsorpThermalBack;
+		Material( MaterNum ).SolarDiffusing = false;
+
+		NominalR( MaterNum ) = Material( MaterNum ).Thickness / Material( MaterNum ).Conductivity;
+		Material( MaterNum ).Resistance = NominalR( MaterNum );
+
+	}
+
+	int num_gases = gasValue.size();
+
+	// Define material properties for gaps
+	for ( int MaterNum = 2; MaterNum <= numberOfNewMaterials; MaterNum += 2 )
+	{
+		Material( MaterNum ).Group = WindowGasMixture;
+		Material( MaterNum ).Name = constructionName + ":GAP" + std::to_string(MaterNum);
+		Material( MaterNum ).Roughness = MediumRough;
+		Material( MaterNum ).ROnly = true;
+		Material( MaterNum ).Thickness = gapThickness;
+		Material( MaterNum ).NumberOfGasesInMixture = num_gases;
+
+		for ( int gas = 1; gas <= num_gases; gas++)
+		{
+			Material( MaterNum ).GasType( gas ) = 0;
+			Material( MaterNum ).GasFract( gas ) = gasValue[gas-1]["Fraction"].asDouble();
+			Material( MaterNum ).GasWght( gas ) = gasValue[gas-1]["Molecular Weight"].asDouble();
+			Material( MaterNum ).GasSpecHeatRatio( gas ) = gasValue[gas-1]["Specific Heat Ratio"].asDouble();
+			for ( int ICoeff = 1; ICoeff <= 3; ++ICoeff ) {
+				Material( MaterNum ).GasCon( ICoeff, gas ) = gasValue[gas-1]["Conductivity"][ICoeff-1].asDouble();
+				Material( MaterNum ).GasVis( ICoeff, gas ) = gasValue[gas-1]["Viscosity"][ICoeff-1].asDouble();
+				Material( MaterNum ).GasCp( ICoeff, gas ) = gasValue[gas-1]["Specific Heat"][ICoeff-1].asDouble();
+			}
+		}
+
+		Real64 DenomRGas = ( Material( MaterNum ).GasCon( 1, 1 ) + Material( MaterNum ).GasCon( 1, 2 ) * 300.0 + Material( MaterNum ).GasCon( 1, 3 ) * 90000.0 );
+		NominalR( MaterNum ) = Material( MaterNum ).Thickness / DenomRGas;
+
+	}
+
+	Construct( 1 ).TotLayers = numberOfNewMaterials;
+
+	for ( int Layer = 1; Layer <= numberOfNewMaterials; ++Layer ) {
+		Construct( 1 ).LayerPoint( Layer ) = Layer;
+	}
+
+	NominalRforNominalUCalculation( 1 ) = 0.0;
+	for ( int Layer = 1; Layer <= Construct( 1 ).TotLayers; ++Layer ) {
+		NominalRforNominalUCalculation( 1 ) += NominalR( Construct( 1 ).LayerPoint( Layer ) );
+	}
+
+	CheckAndSetConstructionProperties( 1, ErrorsFound );
+
+	Surface( 1 ).Construction = 1; // This is the only construction available to the dummy surface. The actual surface will reference the real construction.
+	Surface( 1 ).FrameDivider = 0; // Set temporarily until after Center-of-Glass U-factor is calculated
+
+	// Set up U-factor conditions
+	Real64 in_air_temp = u_indoor_temp;
+	Real64 out_air_temp = u_outdoor_temp;
+	Real64 wind_speed = u_wind_speed;
+	Real64 solar_incident = u_solar;
+
+	// Calculate Center-of-Glass U-factor (without Frame)
+	calc_window_performance(in_air_temp, out_air_temp, wind_speed, solar_incident);
+
+	uCOG = -WinHeatGain(1)/(Surface( 1 ).Area*(in_air_temp - out_air_temp));
+
+	if ( numberOfPanes == 1)
+		uEOG = uCOG;
+	else {
+		Real64 eog_a = spacerTypeValue["Coefficients"][std::min(numberOfPanes,3)-2][0].asDouble();
+		Real64 eog_b = spacerTypeValue["Coefficients"][std::min(numberOfPanes,3)-2][1].asDouble();
+		Real64 eog_c = spacerTypeValue["Coefficients"][std::min(numberOfPanes,3)-2][2].asDouble();
+		uEOG = eog_a + eog_b*uCOG + eog_c*pow_2(uCOG);
+	}
+
+	frameEdgeRatio = uEOG/uCOG;
+
+	// Set frame and divider properties
+	if ( hasFrame )
+	{
+		FrameDivider.allocate(1);
+		TotFrameDivider = 1;
+
+		FrameDivider( 1 ).Name = constructionName + ":FRAME";
+		FrameDivider( 1 ).FrameWidth = frameWidth;
+		FrameDivider( 1 ).FrameProjectionOut = 0.0;
+		FrameDivider( 1 ).FrameProjectionIn = 0.0;
+		FrameDivider( 1 ).FrameConductance = frameConductance;
+		FrameDivider( 1 ).FrEdgeToCenterGlCondRatio = frameEdgeRatio;
+		FrameDivider( 1 ).FrameSolAbsorp = frameSolarAbsorptivity;
+		FrameDivider( 1 ).FrameVisAbsorp = frameVisibleAbsorptivity;
+		FrameDivider( 1 ).FrameEmis = frame_IR_emissivity;
+		FrameDivider( 1 ).FrameEdgeWidth = edge_width; // 2.5 in
+		FrameDivider( 1 ).DividerType = DividedLite;
+		FrameDivider( 1 ).DividerWidth = dividerWidth;
+		FrameDivider( 1 ).HorDividers = numHorizontalDividers;
+		FrameDivider( 1 ).VertDividers = numVerticalDividers;
+		FrameDivider( 1 ).DividerProjectionOut = 0.0;
+		FrameDivider( 1 ).DividerProjectionIn = 0.0;
+		FrameDivider( 1 ).DividerConductance = frameConductance;
+		FrameDivider( 1 ).DivEdgeToCenterGlCondRatio = frameEdgeRatio;
+		FrameDivider( 1 ).DividerSolAbsorp = frameSolarAbsorptivity;
+		FrameDivider( 1 ).DividerVisAbsorp = frameVisibleAbsorptivity;
+		FrameDivider( 1 ).DividerEmis = frame_IR_emissivity;
+		FrameDivider( 1 ).DividerEdgeWidth = edge_width; // 2.5 in
+
+		frameArea = fenestrationArea - glazingArea;
+		SurfaceWindow( 1 ).FrameArea = frameArea;
+		SurfaceWindow( 1 ).DividerArea = dividerWidth*(numHorizontalDividers*glazingWidth + numVerticalDividers*glazingHeight - numHorizontalDividers*numVerticalDividers*dividerWidth);
+		Surface( 1 ).Area -= SurfaceWindow( 1 ).DividerArea;
+		SurfaceWindow( 1 ).GlazedFrac = Surface( 1 ).Area / ( Surface( 1 ).Area + SurfaceWindow( 1 ).DividerArea );
+
+		Surface( 1 ).FrameDivider = 1;
+	}
+
+	// Calculate total U-factor
+	calc_window_performance(in_air_temp, out_air_temp, wind_speed, solar_incident);
+
+	uFactor = -WinHeatGain(1)/(fenestrationArea*(in_air_temp - out_air_temp));
+
+	// Set up SHGC conditions
+	in_air_temp = s_indoor_temp;
+	out_air_temp = s_outdoor_temp;
+	wind_speed = s_wind_speed;
+	solar_incident = s_solar;
+
+	// Calculate SHGC
+	calc_window_performance(in_air_temp, out_air_temp, wind_speed, solar_incident);
+
+	Real64 q_total = WinHeatGain(1);
+
+	// NFRC 201-2014 Equation 8-7
+	Real64 q_U = uFactor*fenestrationArea*(out_air_temp - in_air_temp);
+
+	// NFRC 201-2014 Equation 8-2
+	shgc = (q_total - q_U)/(fenestrationArea*solar_incident);
+
+	Real64 non_opaque_area_fraction = Surface( 1 ).Area/fenestrationArea;
+	visibleTransmittance = POLYF(1.0,Construct( 1 ).TransVisBeamCoef( 1 ))*non_opaque_area_fraction;
+
+	// if match not obtained adjust inputs
+
+	// Deallocate construction specific arrays
+	AWinSurf.deallocate();
+	QRadSWwinAbs.deallocate();
+	QRadSWwinAbsLayer.deallocate();
+
+	uFactorDiff = uFactorTarget - uFactor;
+	shgcDiff = shgcTarget - shgc;
+
+	error = std::sqrt(pow_2(uFactorDiff) + pow_2(shgcDiff));
+
+	Real64 uFactorMatchTolerance = 0.05; // Precision of NFRC reporting TODO expose?
+	Real64 opticalMatchTolerance = 0.01; // Precision of NFRC reporting TODO expose?
+
+	matched = (std::abs(uFactorDiff) < uFactorMatchTolerance) && (std::abs(shgcDiff) < opticalMatchTolerance);
+
+} // calculate
+
+Json::Value
+FenestrationSystem::generateOutput() {
+	Json::Value output_1588;
+	output_1588["Metadata"]["Name"] = constructionName;
+	output_1588["Metadata"]["U-factor"] = uFactor;
+	output_1588["Metadata"]["Solar Heat Gain Coefficient"] = shgc;
+	output_1588["Metadata"]["Fenestration Type"] = fenestrationType;
+	output_1588["Metadata"]["Fenstration Area"] = fenestrationArea;
+	output_1588["Metadata"]["Fenestration Width"] = fenestrationWidth;
+	output_1588["Metadata"]["Fenestration Height"] = fenestrationHeight;
+	output_1588["Metadata"]["1588-RP Matching"]["U-factor Target"] = uFactorTarget;
+	output_1588["Metadata"]["1588-RP Matching"]["Solar Heat Gain Coefficient Target"] = shgcTarget;
+	output_1588["Metadata"]["1588-RP Matching"]["U-factor Difference"] = uFactorDiff;
+	output_1588["Metadata"]["1588-RP Matching"]["Solar Heat Gain Coefficient Difference"] = shgcDiff;
+	output_1588["Metadata"]["1588-RP Matching"]["Matched?"] = matched;
+	output_1588["Metadata"]["Visible Transmittance"] = visibleTransmittance;
+	output_1588["Glazing"]["Number of Panes"] = numberOfPanes;
+	output_1588["Glazing"]["Area"] = glazingArea;
+
+	// Since wavelengths are the same for each spectral dataset, they only need
+	// to appear once in the output file.
+	for ( int lam = 1; lam <= int(database.wavelengths.size()); lam++) {
+		output_1588["Glazing"]["Wavelengths"][lam-1] = SpectralData( 1 ).WaveLength( lam );
+	}
+
+	for ( int MaterNum = 1; MaterNum <= numberOfPanes*2 - 1; MaterNum += 2 ) {
+		int i = (MaterNum-1)/2;
+		output_1588["Glazing"]["Panes"][i]["Thickness"] = Material( MaterNum ).Thickness;
+		output_1588["Glazing"]["Panes"][i]["Conductivity"] = Material( MaterNum ).Conductivity;
+		if (i == 0) {
+			output_1588["Glazing"]["Panes"][i]["Coating"] = glazingCoatingType;
+			output_1588["Glazing"]["Panes"][i]["Substrate"] = glazingSubstrateType;
+		}
+		else {
+			output_1588["Glazing"]["Panes"][i]["Coating"] = "NONE";
+			output_1588["Glazing"]["Panes"][i]["Substrate"] = "CLEAR";
+		}
+		output_1588["Glazing"]["Panes"][i]["Average Infrared Transmittance"] = Material( MaterNum ).TransThermal;
+		output_1588["Glazing"]["Panes"][i]["Average Infrared Back Side Absorptance"] = Material( MaterNum ).AbsorpThermalBack;
+		output_1588["Glazing"]["Panes"][i]["Average Infrared Front Side Absorptance"] = Material( MaterNum ).AbsorpThermalFront;
+
+		int spectral_data_index = Material( MaterNum ).GlassSpectralDataPtr;
+
+		Real64 TransSolUp = 0.0,
+					 TransVisUp = 0.0,
+					 RefFrontSolUp = 0.0,
+					 RefFrontVisUp = 0.0,
+					 RefBackSolUp = 0.0,
+					 RefBackVisUp = 0.0,
+					 SolDown = 0.0,
+					 VisDown = 0.0;
+
+		for ( int lam = 1; lam <= int(database.wavelengths.size()); lam++) {
+			Real64 Trans = SpectralData(spectral_data_index).Trans( lam );
+			Real64 RefFront = SpectralData(spectral_data_index).ReflFront( lam );
+			Real64 RefBack = SpectralData(spectral_data_index).ReflBack( lam );
+			output_1588["Glazing"]["Panes"][i]["Transmittance"][lam-1] = Trans;
+			output_1588["Glazing"]["Panes"][i]["Reflectance (Front)"][lam-1] = RefFront;
+			output_1588["Glazing"]["Panes"][i]["Reflectance (Back)"][lam-1] = RefBack;
+
+			// Numeric integration of average properties. Follows same method as WindowManager, but uses consistent wavelengths.
+			if (lam != int(database.wavelengths.size())) {
+				// Spectral Properties
+				Real64 TransNext = SpectralData(spectral_data_index).Trans( lam + 1 );
+				Real64 RefFrontNext = SpectralData(spectral_data_index).ReflFront( lam + 1 );
+				Real64 RefBackNext = SpectralData(spectral_data_index).ReflBack( lam + 1);
+
+				// Wavelengths
+				Real64 Wl = SpectralData(spectral_data_index).WaveLength( lam );
+				Real64 WlNext = SpectralData(spectral_data_index).WaveLength( lam + 1 );
+
+				// Solar Spectrum and Photopic Response
+				Real64 SS = database.solarSpectrum[lam - 1];
+				Real64 SSNext = database.solarSpectrum[lam];
+
+				Real64 PR = database.photopicResponse[lam - 1];
+				Real64 PRNext = database.photopicResponse[lam];
+
+				Real64 eSol = (WlNext - Wl)*0.5*(SS + SSNext);
+				Real64 eVis = (WlNext - Wl)*0.5*(SS + SSNext)*0.5*(PR + PRNext);
+
+				TransSolUp += eSol*0.5*(Trans + TransNext);
+				RefFrontSolUp += eSol*0.5*(RefFront + RefFrontNext);
+				RefBackSolUp += eSol*0.5*(RefBack + RefBackNext);
+
+				TransVisUp += eVis*0.5*(Trans + TransNext);
+				RefFrontVisUp += eVis*0.5*(RefFront + RefFrontNext);
+				RefBackVisUp += eVis*0.5*(RefBack + RefBackNext);
+
+				SolDown += eSol;
+				VisDown += eVis;
+
+			}
+
+		}
+
+		output_1588["Glazing"]["Panes"][i]["Average Solar Transmittance"] = TransSolUp/SolDown;
+		output_1588["Glazing"]["Panes"][i]["Average Solar Front Side Reflectance"] = RefFrontSolUp/SolDown;
+		output_1588["Glazing"]["Panes"][i]["Average Solar Back Side Reflectance"] = RefBackSolUp/SolDown;
+		output_1588["Glazing"]["Panes"][i]["Average Visible Transmittance"] = TransVisUp/VisDown;
+		output_1588["Glazing"]["Panes"][i]["Average Visible Front Side Reflectance"] = RefFrontVisUp/VisDown;
+		output_1588["Glazing"]["Panes"][i]["Average Visible Back Side Reflectance"] = RefBackVisUp/VisDown;
+	}
+
+	for ( int MaterNum = 2; MaterNum <= numberOfPanes*2 - 1; MaterNum += 2 ) {
+		int i = (MaterNum-2)/2;
+		output_1588["Glazing"]["Gaps"][i]["Primary Gas"] = gasType;
+		output_1588["Glazing"]["Gaps"][i]["Thickness"] = Material( MaterNum ).Thickness;
+		for (int gas = 1; gas <= Material( MaterNum ).NumberOfGasesInMixture; gas++) {
+			output_1588["Glazing"]["Gaps"][i]["Mixture"][gas-1]["Gas"] = database.getTraitValueByIndex("Gases",gasTypeIndex)[gas-1]["Gas"];
+			output_1588["Glazing"]["Gaps"][i]["Mixture"][gas-1]["Fraction"] = Material( MaterNum ).GasFract( gas );
+			output_1588["Glazing"]["Gaps"][i]["Mixture"][gas-1]["Molecular Weight"] = Material( MaterNum ).GasWght( gas );
+			output_1588["Glazing"]["Gaps"][i]["Mixture"][gas-1]["Specific Heat Ratio"] = Material( MaterNum ).GasSpecHeatRatio( gas );
+			for ( int ICoeff = 1; ICoeff <= 3; ++ICoeff ) {
+				output_1588["Glazing"]["Gaps"][i]["Mixture"][gas-1]["Conductivity"][ICoeff-1] = Material( MaterNum ).GasCon( gas, ICoeff );
+				output_1588["Glazing"]["Gaps"][i]["Mixture"][gas-1]["Viscosity"][ICoeff-1] = Material( MaterNum ).GasVis( gas, ICoeff );
+				output_1588["Glazing"]["Gaps"][i]["Mixture"][gas-1]["Specific Heat"][ICoeff-1] = Material( MaterNum ).GasCp( gas, ICoeff );
+			}
+		}
+	}
+
+	output_1588["Glazing"]["Center-of-Glass U-factor"] = uCOG;
+	output_1588["Frame and Divider"]["Frame Width"] = frameWidth;
+	output_1588["Frame and Divider"]["Frame Conductance"] = frameConductance;
+	output_1588["Frame and Divider"]["Frame Material"] = frameType;
+	output_1588["Frame and Divider"]["Spacer Type"] = spacerType;
+	output_1588["Frame and Divider"]["Edge-of-Glass U-factor"] = uEOG;
+	output_1588["Frame and Divider"]["Edge-of-Glass Conductance Ratio"] = frameEdgeRatio;
+	output_1588["Frame and Divider"]["Frame Area"] = frameArea;
+	output_1588["Frame and Divider"]["Divider Width"] = dividerWidth;
+	output_1588["Frame and Divider"]["Number of Vertical Dividers"] = numVerticalDividers;
+	output_1588["Frame and Divider"]["Number of Horizontal Dividers"] = numHorizontalDividers;
+
+	return output_1588;
 }
 
 void create_dummy_variables()
@@ -1666,7 +1626,7 @@ Real64 ASHRAE1588Database::getContinuousTraitValueWithMaxUtility(std::string tra
 	else if (traitNode["Distribution"].asString() == "Log-Normal") {
 		Real64 shift = traitNode["Shift"].asDouble();
 		Real64 shape = traitNode["Shape"].asDouble();
-		return exp(shift-pow2(shape));
+		return exp(shift-pow_2(shape));
 	}
 	else {
 		return -1;
