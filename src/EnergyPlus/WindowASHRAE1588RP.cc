@@ -248,7 +248,7 @@ CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound )
 		else
 		{
 			numberOfPanes_lock = true;
-			std::string panesName = std::to_string(ConstructNumerics( 3 )).substr(0,1);
+			std::string panesName = std::to_string(std::lround(ConstructNumerics( 3 )));
 			fenestrationTraits.push_back(database.getTraitIndexByName("Panes",panesName));
 		}
 		if ( ! numberOfPanes_lock )
