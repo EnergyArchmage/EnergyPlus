@@ -1726,7 +1726,7 @@ bool
 ASHRAE1588Database::isContinuous(std::string trait)
 {
 	Json::Value &traitNode = db["Traits"][trait];
-	return traitNode.isMember("Distribution");
+	return !traitNode.isArray();
 }
 
 Real64
