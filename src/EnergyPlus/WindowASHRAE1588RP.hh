@@ -12,15 +12,15 @@ namespace WindowASHRAE1588RP {
 void
 CreateASHRAE1588RPConstructions( int & ConstrNum, bool & ErrorsFound );
 
-Json::Value read_1588_database(std::string file_path);
+Json::Value read1588Database(std::string filePath);
 
-void search_database_keys_for_input(const std::string &constructionName, const std::string &field_name, const std::vector< std::string > &keys, const std::string &input, bool &ErrorsFound);
+void searchDatabaseKeysForInput(const std::string &constructionName, const std::string &fieldName, const std::vector< std::string > &keys, const std::string &input, bool &ErrorsFound);
 
-void create_dummy_variables();
+void createDummyVariables();
 
-void remove_dummy_variables();
+void removeDummyVariables();
 
-void calc_window_performance(Real64 T_in, Real64 T_out, Real64 v_ws, Real64 I_s);
+void calcWindowPerformance(Real64 T_in, Real64 T_out, Real64 v_ws, Real64 I_s);
 
 class ASHRAE1588Database {
 public: // Creation
