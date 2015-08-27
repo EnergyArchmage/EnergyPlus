@@ -6,8 +6,8 @@
 #include <json/json.h>
 
 // GlobalSearch Header
-#include <objective_function.hh>
-#include <genetic_algorithm.hh>
+#include <global_search/objective_function.hh>
+#include <global_search/genetic_algorithm.hh>
 
 namespace EnergyPlus {
 

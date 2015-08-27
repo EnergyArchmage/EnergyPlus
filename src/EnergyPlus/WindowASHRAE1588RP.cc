@@ -8,8 +8,8 @@
 #include <ObjexxFCL/Fmath.hh>
 
 // GlobalSearch Headers
-#include <genetic_algorithm.hh>
-#include <objective_function.hh>
+#include <global_search/genetic_algorithm.hh>
+#include <global_search/objective_function.hh>
 
 // EnergyPlus Headers
 #include <WindowASHRAE1588RP.hh>

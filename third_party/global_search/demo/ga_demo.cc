@@ -1,7 +1,7 @@
 #include <iostream>
 #include <iomanip>
 #include <vector>
-#include "genetic_algorithm.hh"
+#include "global_search/genetic_algorithm.hh"
 
 int main(int argc, char *argv[])
 {
